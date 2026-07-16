@@ -1,0 +1,11 @@
+{
+  "name": "@owlsync/shared",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "main": "src/index.js",
+  "scripts": {},
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}

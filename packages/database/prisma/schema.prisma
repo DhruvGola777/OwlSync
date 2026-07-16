@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String          @id @default(uuid())
+  email              String          @unique
+  username           String          @unique
+  password           String?         // Optional because OAuth users might not have a password
+  name               String?
+  avatarUrl          String?
+  isEmailVerified    Boolean         @default(false)
+  isTwoFactorEnabled Boolean         @default(false)
+  twoFactorSecret    String?
+  accounts           OAuthAccount[]
+  sessions           DeviceSession[]
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+}
+
+model OAuthAccount {
+  id                String   @id @default(uuid())
+  userId            String
+  provider          String   // e.g., "google", "github"
+  providerAccountId String   // The user ID from the provider
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([provider, providerAccountId])
+}
+
+model DeviceSession {
+  id           String   @id @default(uuid())
+  userId       String
+  refreshToken String   @unique
+  userAgent    String?
+  ipAddress    String?
+  expiresAt    DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+enum VerificationTokenType {
+  MAGIC_LINK
+  PASSWORD_RESET
+  EMAIL_VERIFICATION
+}
+
+model VerificationToken {
+  id         String                @id @default(uuid())
+  identifier String                // e.g. email or userId
+  token      String                @unique
+  type       VerificationTokenType
+  expiresAt  DateTime
+  createdAt  DateTime              @default(now())
+}
