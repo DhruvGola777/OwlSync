@@ -8,11 +8,6 @@ import {
   refreshSession,
   logout,
   verifyEmail,
-  deleteAccount,
-  getSessions,
-  revokeDeviceSession,
-  setupTwoFactor,
-  verifyTwoFactor,
   loginTwoFactor,
   requestMagicLink,
   verifyMagicLink,
@@ -27,7 +22,6 @@ import {
   magicLinkRequestSchema, 
   passwordResetRequestSchema, 
   passwordResetSchema, 
-  verifyTwoFactorSchema, 
   loginTwoFactorSchema 
 } from '@owlsync/shared';
 
@@ -39,15 +33,8 @@ router.post('/login', authRateLimiter, validateRequest(loginSchema), login);
 router.post('/refresh', refreshSession);
 router.post('/logout', logout);
 router.get('/verify-email', verifyEmail);
-router.delete('/account', requireAuth, deleteAccount);
-
-// Sessions
-router.get('/sessions', requireAuth, getSessions);
-router.delete('/sessions/:id', requireAuth, revokeDeviceSession);
 
 // 2FA
-router.post('/2fa/setup', requireAuth, setupTwoFactor);
-router.post('/2fa/verify', authRateLimiter, requireAuth, validateRequest(verifyTwoFactorSchema), verifyTwoFactor);
 router.post('/2fa/login', authRateLimiter, validateRequest(loginTwoFactorSchema), loginTwoFactor);
 
 // Magic Link

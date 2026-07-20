@@ -3,6 +3,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { env } from './config/env.js';
 import authRoutes from './modules/auth/auth.routes.js';
+import usersRoutes from './modules/users/users.routes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import AppError from './utils/AppError.js';
 
@@ -19,6 +20,7 @@ app.use(cookieParser());
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/users', usersRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

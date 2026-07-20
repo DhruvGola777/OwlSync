@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import qrcode from 'qrcode';
 import AppError from '../../utils/AppError.js';
+import { getRegistrationEmailHtml, getOAuthWelcomeEmailHtml } from '../../utils/emailTemplates.js';
 import { env } from '../../config/env.js';
 import {
   createSession,
@@ -11,18 +12,13 @@ import {
   rotateSession,
   findOrCreateOAuthUser,
   userResponsePayload,
-  getUserSessions,
-  revokeSessionById,
-  generateTwoFactorSecret,
-  verifyTwoFactorToken,
-  updateUserTwoFactor,
   generateVerificationToken,
   verifyVerificationToken,
   sendEmail,
   updatePassword,
-  verifyUserEmail,
-  deleteUser
+  verifyUserEmail
 } from './auth.service.js';
+import { verifyTwoFactorToken } from '../users/users.service.js';
 
 const ACCESS_TOKEN_COOKIE = 'token';
 const REFRESH_TOKEN_COOKIE = 'refreshToken';
@@ -66,12 +62,7 @@ export const register = async (req, res, next) => {
     // Send a verification email instead of instant login
     const { token } = await generateVerificationToken(email, 'EMAIL_VERIFICATION');
     const link = `http://localhost:4000/api/auth/verify-email?token=${token}`;
-    
-    const welcomeHtml = `
-      <h1>Welcome to OwlSync, ${name || 'there'}!</h1>
-      <p>We are absolutely thrilled to have you on board.</p>
-      <p>Please verify your email address by clicking <a href="${link}">here</a>.</p>
-    `;
+    const welcomeHtml = getRegistrationEmailHtml(name, link);
     sendEmail(email, 'Verify your email - OwlSync', welcomeHtml).catch(console.error);
 
     res.status(201).json({
@@ -179,63 +170,6 @@ export const verifyEmail = async (req, res, next) => {
     
     // Redirect to frontend login with a success parameter
     res.redirect('http://localhost:5173/login?verified=true');
-  } catch (err) {
-    next(err);
-  }
-};
-
-export const deleteAccount = async (req, res, next) => {
-  try {
-    await deleteUser(req.user.id);
-    clearAuthCookies(res);
-    res.status(200).json({ message: 'Account deleted successfully' });
-  } catch (err) {
-    next(err);
-  }
-};
-
-// Sessions
-export const getSessions = async (req, res, next) => {
-  try {
-    const sessions = await getUserSessions(req.user.id);
-    res.status(200).json({ sessions });
-  } catch (err) {
-    next(err);
-  }
-};
-
-export const revokeDeviceSession = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    await revokeSessionById(id);
-    res.status(200).json({ message: 'Session revoked' });
-  } catch (err) {
-    next(err);
-  }
-};
-
-// 2FA
-export const setupTwoFactor = async (req, res, next) => {
-  try {
-    const { secret, otpauthUrl } = generateTwoFactorSecret(req.user.email);
-    await updateUserTwoFactor(req.user.id, false, secret);
-    const qrCodeUrl = await qrcode.toDataURL(otpauthUrl);
-    res.status(200).json({ secret, qrCodeUrl });
-  } catch (err) {
-    next(err);
-  }
-};
-
-export const verifyTwoFactor = async (req, res, next) => {
-  try {
-    const { token } = req.body;
-    if (!req.user.twoFactorSecret) throw new AppError('2FA not set up', 400);
-    
-    const isValid = await verifyTwoFactorToken(token, req.user.twoFactorSecret);
-    if (!isValid) throw new AppError('Invalid 2FA code', 400);
-
-    await updateUserTwoFactor(req.user.id, true, req.user.twoFactorSecret);
-    res.status(200).json({ message: '2FA enabled successfully', user: userResponsePayload(req.user) });
   } catch (err) {
     next(err);
   }
@@ -444,7 +378,7 @@ export const oauthCallback = async (req, res, next) => {
       throw new AppError('Unsupported provider', 400);
     }
 
-    const user = await findOrCreateOAuthUser({ 
+    const { user, isNewUser } = await findOrCreateOAuthUser({ 
       provider, 
       providerAccountId: profile.providerAccountId, 
       email: profile.email, 
@@ -452,6 +386,11 @@ export const oauthCallback = async (req, res, next) => {
       avatarUrl: profile.avatarUrl
     });
     
+    if (isNewUser) {
+      const welcomeHtml = getOAuthWelcomeEmailHtml(profile.name, provider);
+      sendEmail(profile.email, 'Welcome to OwlSync!', welcomeHtml).catch(console.error);
+    }
+
     const session = await createSession({
       userId: user.id,
       userAgent: req.get('user-agent'),

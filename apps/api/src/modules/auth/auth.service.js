@@ -119,10 +119,11 @@ export const findOrCreateOAuthUser = async ({ provider, providerAccountId, email
   });
 
   if (account) {
-    return account.user;
+    return { user: account.user, isNewUser: false };
   }
 
   let user = await prisma.user.findUnique({ where: { email } });
+  let isNewUser = false;
 
   if (!user) {
     const generatedUsername = await generateUniqueUsername(email);
@@ -135,6 +136,7 @@ export const findOrCreateOAuthUser = async ({ provider, providerAccountId, email
         isEmailVerified: true,
       },
     });
+    isNewUser = true;
   } else if (!user.avatarUrl && avatarUrl) {
     user = await prisma.user.update({
       where: { id: user.id },
@@ -150,7 +152,7 @@ export const findOrCreateOAuthUser = async ({ provider, providerAccountId, email
     },
   });
 
-  return user;
+  return { user, isNewUser };
 };
 
 export const userResponsePayload = (user) => ({
