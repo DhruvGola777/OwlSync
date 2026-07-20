@@ -27,7 +27,7 @@ export const Dashboard = () => {
   const fetchRooms = async () => {
     try {
       const res = await api.getRooms();
-      setRooms(res.data.rooms);
+      setRooms(res.rooms || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -47,11 +47,11 @@ export const Dashboard = () => {
         description: '',
         password: newRoomPassword || undefined 
       });
-      setRooms([res.data.room, ...rooms]);
+      setRooms([res.room, ...rooms]);
       setShowCreateModal(false);
       setNewRoomName('');
       setNewRoomPassword('');
-      navigate(`/room/${res.data.room.id}`);
+      navigate(`/room/${res.room.id}`);
     } catch (err) {
       console.error("CREATE ROOM ERROR:", err);
       setError(err.message + " | " + JSON.stringify(err) + " | " + (err.response ? JSON.stringify(err.response.data) : "No response"));

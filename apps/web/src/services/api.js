@@ -233,5 +233,32 @@ export const api = {
     } catch (error) {
       throw new Error(extractError(error, 'Failed to join room'));
     }
+  },
+
+  async leaveRoom(roomId) {
+    try {
+      const res = await apiClient.post(`/rooms/${roomId}/leave`);
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to leave room'));
+    }
+  },
+
+  async kickMember(roomId, userId) {
+    try {
+      const res = await apiClient.delete(`/rooms/${roomId}/members/${userId}`);
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to kick member'));
+    }
+  },
+
+  async deleteRoom(roomId) {
+    try {
+      const res = await apiClient.delete(`/rooms/${roomId}`);
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to delete room'));
+    }
   }
 };

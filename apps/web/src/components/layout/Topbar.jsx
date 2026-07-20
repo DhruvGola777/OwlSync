@@ -1,6 +1,7 @@
 import React from 'react';
 import { Bell, Search, User } from 'lucide-react';
 import { useAuth } from '../../providers/AuthProvider';
+import AvatarDisplay from '../ui/AvatarDisplay';
 
 export const Topbar = () => {
   const { user } = useAuth();
@@ -35,9 +36,7 @@ export const Topbar = () => {
           
           <div className="flex items-center gap-x-4">
             <div className="flex items-center gap-3 rounded-full bg-slate-50 py-1.5 px-3 border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
-              <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
-                {user?.name?.charAt(0).toUpperCase() || <User className="h-5 w-5" />}
-              </div>
+              <AvatarDisplay avatarUrl={user?.avatarUrl} name={user?.name || user?.username} size={32} />
               <span className="text-sm font-medium text-slate-700 hidden sm:block">
                 {user?.name}
               </span>

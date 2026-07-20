@@ -6,13 +6,20 @@ const prisma = new PrismaClient();
 export const updateProfile = async (userId, data) => {
   return prisma.user.update({
     where: { id: userId },
-    data,
+    data: {
+      ...data,
+      status: 'ONLINE',
+      lastSeen: new Date()
+    },
     select: {
       id: true,
       username: true,
       email: true,
       name: true,
       avatarUrl: true,
+      bio: true,
+      status: true,
+      lastSeen: true,
       isEmailVerified: true,
       isTwoFactorEnabled: true,
     }

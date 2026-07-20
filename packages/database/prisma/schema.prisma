@@ -19,6 +19,7 @@ model User {
   twoFactorSecret    String?
   bio                String?
   status             String          @default("OFFLINE")
+  lastSeen           DateTime        @default(now())
   accounts           OAuthAccount[]
   sessions           DeviceSession[]
   rooms              RoomMember[]

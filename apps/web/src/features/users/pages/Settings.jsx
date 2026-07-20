@@ -2,6 +2,40 @@ import React, { useState, useEffect } from 'react';
 import { UAParser } from 'ua-parser-js';
 import { api } from '../../../services/api';
 import { useAuth } from '../../../providers/AuthProvider';
+import AvatarDisplay from '../../../components/ui/AvatarDisplay';
+import { genConfig } from 'react-nice-avatar';
+
+function formatRelativeDate(dateString) {
+  if (!dateString) return 'Never';
+  
+  const date = new Date(dateString);
+  const now = new Date();
+  
+  const timeFormatter = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
+  const timeString = timeFormatter.format(date).toLowerCase();
+
+  const dateAtMidnight = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const nowAtMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffCalendarDays = Math.round((nowAtMidnight - dateAtMidnight) / (1000 * 60 * 60 * 24));
+
+  if (diffCalendarDays === 0) {
+    return `Today ${timeString}`;
+  } else if (diffCalendarDays === 1) {
+    return `Yesterday ${timeString}`;
+  } else if (diffCalendarDays < 7) {
+    const weekdayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'long' });
+    return `${weekdayFormatter.format(date)} ${timeString}`;
+  } else if (diffCalendarDays < 30) {
+    const weeks = Math.floor(diffCalendarDays / 7);
+    return `${weeks} week${weeks > 1 ? 's' : ''} ago`;
+  } else if (diffCalendarDays < 365) {
+    const months = Math.floor(diffCalendarDays / 30);
+    return `${months} month${months > 1 ? 's' : ''} ago`;
+  } else {
+    const years = Math.floor(diffCalendarDays / 365);
+    return `${years} year${years > 1 ? 's' : ''} ago`;
+  }
+}
 
 export default function Settings() {
   const { user, logout, checkAuth } = useAuth();
@@ -48,6 +82,8 @@ export default function Settings() {
 function ProfileTab({ user, checkAuth }) {
   const [name, setName] = useState(user?.name || '');
   const [username, setUsername] = useState(user?.username || '');
+  const [bio, setBio] = useState(user?.bio || '');
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || '');
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -55,7 +91,7 @@ function ProfileTab({ user, checkAuth }) {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.updateProfile({ name, username });
+      await api.updateProfile({ name, username, bio, avatarUrl });
       await checkAuth(); // refresh user data
       setMsg('Profile updated successfully!');
     } catch (err) {
@@ -65,11 +101,52 @@ function ProfileTab({ user, checkAuth }) {
     }
   };
 
+  const handleRandomizeAvatar = () => {
+    const config = genConfig();
+    setAvatarUrl(JSON.stringify(config));
+  };
+  
+  const handleClearAvatar = () => {
+    setAvatarUrl('');
+  };
+
+  const formattedLastSeen = formatRelativeDate(user?.lastSeen);
+
   return (
     <div>
       <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#111827' }}>Profile Information</h2>
+      
+      <div style={{ marginBottom: '1.5rem', padding: '1rem', background: '#f9fafb', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <p style={{ margin: 0, color: '#374151', fontWeight: '500' }}>Status: <span style={{ color: user?.status === 'ONLINE' ? '#10b981' : '#6b7280' }}>{user?.status || 'OFFLINE'}</span></p>
+          <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>Last seen: {formattedLastSeen}</p>
+        </div>
+      </div>
+
       {msg && <p style={{ marginBottom: '1rem', color: msg.includes('success') ? '#10b981' : '#ef4444' }}>{msg}</p>}
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: '400px' }}>
+      
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '500px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.5rem' }}>
+          <div>
+            <AvatarDisplay avatarUrl={avatarUrl} name={name} size={100} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>Avatar</label>
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <button type="button" onClick={handleRandomizeAvatar} style={{ padding: '0.5rem 1rem', background: '#4f46e5', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem' }}>Randomize Avatar</button>
+              <button type="button" onClick={handleClearAvatar} style={{ padding: '0.5rem 1rem', background: 'white', color: '#ef4444', border: '1px solid #ef4444', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem' }}>Use Initials</button>
+            </div>
+            <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#6b7280' }}>Or paste a photo URL below:</p>
+            <input 
+              type="text" 
+              value={avatarUrl.startsWith('{') ? '' : avatarUrl} 
+              onChange={e => setAvatarUrl(e.target.value)} 
+              placeholder="https://..."
+              style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', outline: 'none', marginTop: '0.25rem' }}
+            />
+          </div>
+        </div>
+
         <div>
           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>Name</label>
           <input 
@@ -79,6 +156,7 @@ function ProfileTab({ user, checkAuth }) {
             style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', outline: 'none' }}
           />
         </div>
+        
         <div>
           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>Username</label>
           <input 
@@ -88,7 +166,19 @@ function ProfileTab({ user, checkAuth }) {
             style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', outline: 'none' }}
           />
         </div>
-        <button disabled={loading} type="submit" style={{ padding: '0.75rem', background: '#4f46e5', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '500' }}>
+
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>Bio</label>
+          <textarea 
+            value={bio} 
+            onChange={e => setBio(e.target.value)} 
+            rows={4}
+            style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', outline: 'none', resize: 'vertical' }}
+            placeholder="Tell us a little about yourself..."
+          />
+        </div>
+
+        <button disabled={loading} type="submit" style={{ padding: '0.75rem', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', alignSelf: 'flex-start' }}>
           {loading ? 'Saving...' : 'Save Changes'}
         </button>
       </form>

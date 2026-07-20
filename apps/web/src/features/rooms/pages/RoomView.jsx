@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../../services/api';
 import { socketService } from '../../../services/socket';
 import { useAuth } from '../../../providers/AuthProvider';
-import { Users, Settings, MessageSquare, Code, Loader2, X } from 'lucide-react';
+import { Users, Settings, MessageSquare, Code, Loader2, X, LogOut, UserMinus } from 'lucide-react';
+import AvatarDisplay from '../../../components/ui/AvatarDisplay';
 
 export const RoomView = () => {
   const { id } = useParams();
@@ -15,13 +16,50 @@ export const RoomView = () => {
   const [activeUsers, setActiveUsers] = useState([]);
   const [isMembersOpen, setIsMembersOpen] = useState(false);
 
+  const handleLeaveRoom = async () => {
+    if (window.confirm("Are you sure you want to leave this room?")) {
+      try {
+        await api.leaveRoom(room.id);
+        navigate('/');
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  };
+
+  const handleDeleteRoom = async () => {
+    if (window.confirm("Are you sure you want to permanently delete this room? This action cannot be undone.")) {
+      try {
+        await api.deleteRoom(room.id);
+        navigate('/');
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  };
+
+  const handleKickMember = async (targetUserId) => {
+    if (window.confirm("Are you sure you want to kick this user?")) {
+      try {
+        await api.kickMember(room.id, targetUserId);
+        // Optimistically update the UI
+        setRoom(prev => ({
+          ...prev,
+          members: prev.members.filter(m => m.user.id !== targetUserId)
+        }));
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  };
+
   useEffect(() => {
     let socket;
     
     const fetchRoomAndConnect = async () => {
       try {
         const res = await api.getRoom(id);
-        setRoom(res.data.room);
+        setRoom(res.room);
 
         // Connect to socket and join room
         socket = socketService.connect(token);
@@ -96,6 +134,26 @@ export const RoomView = () => {
           </div>
           
           <div className="flex items-center space-x-2">
+            {room.ownerId === user?.id && (
+              <button 
+                onClick={handleDeleteRoom}
+                className="flex items-center px-3 py-1.5 text-sm font-medium text-red-400 hover:text-white hover:bg-red-500/20 rounded-lg transition-colors border border-red-500/30"
+                title="Delete Room"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Delete Room
+              </button>
+            )}
+            {room.ownerId !== user?.id && (
+              <button 
+                onClick={handleLeaveRoom}
+                className="flex items-center px-3 py-1.5 text-sm font-medium text-red-400 hover:text-white hover:bg-red-500/20 rounded-lg transition-colors border border-red-500/30"
+                title="Leave Room"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Leave
+              </button>
+            )}
             <button 
               onClick={() => setIsMembersOpen(!isMembersOpen)}
               className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
@@ -144,20 +202,31 @@ export const RoomView = () => {
                 const isOnline = activeUsers.includes(member.user.id);
                 if (!isOnline) return null;
                 return (
-                  <div key={member.id} className="flex items-center space-x-3 p-2 rounded-lg bg-white/5">
-                    <div className="relative">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center text-white font-medium text-sm">
-                        {member.user.name?.[0] || member.user.username[0].toUpperCase()}
-                      </div>
+                  <div key={member.id} className="flex items-center space-x-3 p-2 rounded-lg bg-white/5 group relative">
+                    <div className="relative shrink-0">
+                      <AvatarDisplay 
+                        avatarUrl={member.user.avatarUrl} 
+                        name={member.user.name || member.user.username} 
+                        size={32} 
+                      />
                       <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-gray-900" />
                     </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-200">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-200 truncate">
                         {member.user.name || member.user.username}
                         {member.user.id === user?.id && <span className="ml-1 text-xs text-gray-500">(You)</span>}
                       </div>
                       <div className="text-xs text-gray-400">{member.role}</div>
                     </div>
+                    {room.ownerId === user?.id && member.user.id !== user?.id && (
+                      <button
+                        onClick={() => handleKickMember(member.user.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-all shrink-0"
+                        title="Kick from room"
+                      >
+                        <UserMinus className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 );
               })}

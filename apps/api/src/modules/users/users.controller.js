@@ -18,6 +18,9 @@ export const getMe = async (req, res, next) => {
       email: req.user.email,
       name: req.user.name || null,
       avatarUrl: req.user.avatarUrl || null,
+      bio: req.user.bio || null,
+      status: req.user.status || 'OFFLINE',
+      lastSeen: req.user.lastSeen || new Date(),
       isEmailVerified: req.user.isEmailVerified || false,
       isTwoFactorEnabled: req.user.isTwoFactorEnabled || false,
     };
@@ -29,8 +32,8 @@ export const getMe = async (req, res, next) => {
 
 export const updateMe = async (req, res, next) => {
   try {
-    const { name, username } = req.body;
-    const updatedUser = await updateProfile(req.user.id, { name, username });
+    const { name, username, avatarUrl, bio } = req.body;
+    const updatedUser = await updateProfile(req.user.id, { name, username, avatarUrl, bio });
     res.status(200).json({ message: 'Profile updated successfully', user: updatedUser });
   } catch (err) {
     next(err);
