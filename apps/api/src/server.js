@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import { env } from './config/env.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import usersRoutes from './modules/users/users.routes.js';
+import roomRoutes from './modules/rooms/rooms.routes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import AppError from './utils/AppError.js';
 
@@ -12,8 +13,8 @@ const PORT = env.PORT;
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174'], // Allow both common Vite ports
-  credentials: true // Allow cookies to be sent
+  origin: true, // Allow all origins for dev
+  credentials: true
 }));
 app.use(express.json());
 app.use(cookieParser());
@@ -21,6 +22,7 @@ app.use(cookieParser());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/rooms', roomRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

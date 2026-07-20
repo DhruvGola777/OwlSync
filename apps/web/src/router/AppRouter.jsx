@@ -7,6 +7,7 @@ import { ForgotPassword } from '../features/auth/pages/ForgotPassword';
 import { ResetPassword } from '../features/auth/pages/ResetPassword';
 import { MagicLink } from '../features/auth/pages/MagicLink';
 import { Dashboard } from '../features/dashboard/pages/Dashboard';
+import { RoomView } from '../features/rooms/pages/RoomView';
 import { ProtectedRoute } from './ProtectedRoute';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 
@@ -23,9 +24,12 @@ export const AppRouter = () => {
       
       {/* Protected Routes */}
       <Route element={<ProtectedRoute />}>
+        {/* Full-screen workspace IDE view */}
+        <Route path="/room/:id" element={<RoomView />} />
+        
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/workspaces" element={<div className="p-8"><h1 className="text-2xl font-bold text-slate-800">Workspaces</h1><p className="mt-2 text-slate-600">Coming soon...</p></div>} />
+          <Route path="/workspaces" element={<Navigate to="/dashboard" replace />} />
           <Route path="/projects" element={<div className="p-8"><h1 className="text-2xl font-bold text-slate-800">Projects</h1><p className="mt-2 text-slate-600">Coming soon...</p></div>} />
           <Route path="/tasks" element={<div className="p-8"><h1 className="text-2xl font-bold text-slate-800">Tasks</h1><p className="mt-2 text-slate-600">Coming soon...</p></div>} />
           <Route path="/settings" element={<Settings />} />

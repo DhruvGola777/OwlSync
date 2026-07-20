@@ -17,8 +17,12 @@ model User {
   isEmailVerified    Boolean         @default(false)
   isTwoFactorEnabled Boolean         @default(false)
   twoFactorSecret    String?
+  bio                String?
+  status             String          @default("OFFLINE")
   accounts           OAuthAccount[]
   sessions           DeviceSession[]
+  rooms              RoomMember[]
+  ownedRooms         Room[]          @relation("RoomOwner")
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 }
@@ -60,4 +64,35 @@ model VerificationToken {
   type       VerificationTokenType
   expiresAt  DateTime
   createdAt  DateTime              @default(now())
+}
+
+model Room {
+  id          String            @id @default(uuid())
+  name        String
+  description String?
+  password    String?           // Hashed password if the room is protected
+  ownerId     String
+  owner       User              @relation("RoomOwner", fields: [ownerId], references: [id])
+  members     RoomMember[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+enum RoomRole {
+  OWNER
+  ADMIN
+  MEMBER
+  GUEST
+}
+
+model RoomMember {
+  id          String        @id @default(uuid())
+  roomId      String
+  userId      String
+  role        RoomRole      @default(MEMBER)
+  room        Room          @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt    DateTime      @default(now())
+
+  @@unique([roomId, userId])
 }

@@ -1,13 +1,13 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Briefcase, FolderKanban, CheckSquare, Settings, LogOut, Code2 } from 'lucide-react';
+import { LayoutDashboard, Users, FolderOpen, Settings as SettingsIcon, LogOut, Code2, Home } from 'lucide-react';
 import { useAuth } from '../../providers/AuthProvider';
 
 const navItems = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Workspaces', href: '/workspaces', icon: Briefcase },
-  { name: 'Projects', href: '/projects', icon: FolderKanban },
-  { name: 'Tasks', href: '/tasks', icon: CheckSquare },
+  { name: 'Dashboard', href: '/dashboard', icon: Home },
+  { name: 'Rooms', href: '/rooms', icon: FolderOpen },
+  { name: 'Team', href: '/team', icon: Users },
+  { name: 'Settings', href: '/settings', icon: SettingsIcon },
 ];
 
 export const Sidebar = () => {
@@ -56,7 +56,7 @@ export const Sidebar = () => {
               }`
             }
           >
-            <Settings className="mr-3 h-5 w-5 shrink-0" />
+            <SettingsIcon className="mr-3 h-5 w-5 shrink-0" />
             Settings
           </NavLink>
           <button

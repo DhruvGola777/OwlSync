@@ -8,6 +8,33 @@ const apiClient = axios.create({
   withCredentials: true,
 });
 
+// Interceptor to handle silent token refresh on 401
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    
+    if (error.response?.status === 401 && !originalRequest._retry && originalRequest.url !== '/auth/login' && originalRequest.url !== '/auth/refresh') {
+      originalRequest._retry = true;
+      try {
+        await apiClient.post('/auth/refresh');
+        return apiClient(originalRequest);
+      } catch (refreshError) {
+        // If refresh fails, they really are logged out
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      }
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
+// Helper to extract the correct message
+const extractError = (error, defaultMsg) => {
+  return error.response?.data?.message || error.response?.data?.error || defaultMsg;
+};
+
 export const api = {
   async register(email, password, name) {
     try {
@@ -149,6 +176,62 @@ export const api = {
       return res.data;
     } catch (error) {
       throw new Error(error.response?.data?.error || 'Invalid or expired magic link');
+    }
+  },
+
+  // Workspaces
+  async getWorkspaces() {
+    try {
+      const res = await apiClient.get('/workspaces');
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to fetch workspaces'));
+    }
+  },
+
+  async createWorkspace(data) {
+    try {
+      const res = await apiClient.post('/workspaces', data);
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to create workspace'));
+    }
+  },
+
+  // Rooms
+  async getRooms() {
+    try {
+      const res = await apiClient.get('/rooms');
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to fetch rooms'));
+    }
+  },
+
+  async createRoom(data) {
+    try {
+      const res = await apiClient.post('/rooms', data);
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to create room'));
+    }
+  },
+
+  async getRoom(id) {
+    try {
+      const res = await apiClient.get(`/rooms/${id}`);
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to fetch room'));
+    }
+  },
+
+  async joinRoom(roomId, password) {
+    try {
+      const res = await apiClient.post(`/rooms/join`, { roomId, password });
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to join room'));
     }
   }
 };
