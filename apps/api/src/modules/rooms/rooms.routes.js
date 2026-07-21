@@ -52,6 +52,12 @@ router.post('/:id/leave', roomController.leaveRoom);
  */
 router.delete('/:id/members/:userId', roomController.kickMember);
 /**
+ * @route GET /api/rooms/:id/messages
+ * @desc Get all messages in a room
+ * @access Private
+ */
+router.get('/:id/messages', roomController.getRoomMessages);
+/**
  * @route DELETE /api/rooms/:id
  * @desc Delete a room
  * @access Private

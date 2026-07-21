@@ -170,3 +170,25 @@ export const deleteRoom = async (roomId, userId) => {
     where: { id: roomId }
   });
 };
+
+export const getRoomMessages = async (roomId, userId) => {
+  // Verify member
+  const member = await prisma.roomMember.findUnique({
+    where: { roomId_userId: { roomId, userId } }
+  });
+
+  if (!member) {
+    throw new AppError('You are not a member of this room', 403);
+  }
+
+  return prisma.message.findMany({
+    where: { roomId },
+    include: {
+      user: {
+        select: { id: true, username: true, name: true, avatarUrl: true }
+      }
+    },
+    orderBy: { createdAt: 'asc' },
+    take: 100 // Limit to last 100 messages for MVP
+  });
+};

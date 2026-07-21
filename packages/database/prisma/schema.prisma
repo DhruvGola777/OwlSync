@@ -28,6 +28,7 @@ model User {
   receivedRequests   FriendRequest[] @relation("ReceivedRequests")
   blocksInitiated    Block[]         @relation("BlocksInitiated")
   blocksReceived     Block[]         @relation("BlocksReceived")
+  messages           Message[]
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 }
@@ -76,9 +77,12 @@ model Room {
   name        String
   description String?
   password    String?           // Hashed password if the room is protected
+  code        String?           @db.Text
+  language    String            @default("javascript")
   ownerId     String
   owner       User              @relation("RoomOwner", fields: [ownerId], references: [id])
   members     RoomMember[]
+  messages    Message[]
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 }
@@ -133,3 +137,15 @@ model Block {
 
   @@unique([blockerId, blockedId])
 }
+
+model Message {
+  id        String   @id @default(uuid())
+  content   String   @db.Text
+  roomId    String
+  userId    String
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+

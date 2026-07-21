@@ -5,6 +5,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { requireSocketAuth } from './middlewares/auth.js';
 import { registerRoomHandlers } from './handlers/room.handlers.js';
+import { registerChatHandlers } from './handlers/chat.handlers.js';
+import { registerEditorHandlers } from './handlers/editor.handlers.js';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -47,6 +49,8 @@ io.on('connection', async (socket) => {
 
   // Register Handlers
   registerRoomHandlers(io, socket);
+  registerChatHandlers(io, socket);
+  registerEditorHandlers(io, socket);
 
   socket.on('disconnect', async () => {
     console.log(`User disconnected: ${userId} (Socket: ${socket.id})`);

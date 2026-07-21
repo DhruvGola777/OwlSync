@@ -85,3 +85,13 @@ export const deleteRoom = async (req, res, next) => {
     next(err);
   }
 };
+
+export const getRoomMessages = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const messages = await roomService.getRoomMessages(id, req.user.id);
+    res.status(200).json({ messages });
+  } catch (err) {
+    next(err);
+  }
+};

@@ -282,6 +282,15 @@ export const api = {
     }
   },
 
+  async getRoomMessages(roomId) {
+    try {
+      const res = await apiClient.get(`/rooms/${roomId}/messages`);
+      return res.data.messages;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to fetch room messages'));
+    }
+  },
+
   // Friends API
   async getFriends() {
     try {

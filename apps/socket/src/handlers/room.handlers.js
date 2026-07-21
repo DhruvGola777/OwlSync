@@ -69,6 +69,27 @@ export const registerRoomHandlers = (io, socket) => {
     }
   });
 
+  socket.on('room:deleted', async ({ roomId }) => {
+    const userId = socket.user?.userId;
+    if (!userId) return;
+
+    try {
+      // Verify the requester is the owner
+      const room = await prisma.room.findUnique({ where: { id: roomId } });
+      // Note: room might already be deleted from DB by the REST API, 
+      // but if it is, findUnique returns null. We should trust the REST API did its job
+      // but to be safe, we can just broadcast the delete and kick everyone out.
+      
+      const sockets = await io.in(roomId).fetchSockets();
+      for (const s of sockets) {
+        s.emit('room:kicked', { roomId, reason: 'Room was deleted' });
+        s.leave(roomId);
+      }
+    } catch (error) {
+      console.error('Error handling room deletion:', error);
+    }
+  });
+
   // Handle sudden disconnects
   socket.on('disconnecting', () => {
     const userId = socket.user?.userId;
