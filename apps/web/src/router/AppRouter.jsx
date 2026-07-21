@@ -10,6 +10,7 @@ import { Dashboard } from '../features/dashboard/pages/Dashboard';
 import { RoomView } from '../features/rooms/pages/RoomView';
 import { ProtectedRoute } from './ProtectedRoute';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
+import PublicProfile from '../features/users/pages/PublicProfile';
 
 export const AppRouter = () => {
   return (
@@ -33,6 +34,7 @@ export const AppRouter = () => {
           <Route path="/projects" element={<div className="p-8"><h1 className="text-2xl font-bold text-slate-800">Projects</h1><p className="mt-2 text-slate-600">Coming soon...</p></div>} />
           <Route path="/tasks" element={<div className="p-8"><h1 className="text-2xl font-bold text-slate-800">Tasks</h1><p className="mt-2 text-slate-600">Coming soon...</p></div>} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/profile/:username" element={<PublicProfile />} />
         </Route>
       </Route>
     </Routes>

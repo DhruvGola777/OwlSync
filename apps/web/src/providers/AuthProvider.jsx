@@ -43,6 +43,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    try {
+      // Import socketService dynamically to avoid circular dependencies if any
+      const { socketService } = await import('../services/socket');
+      socketService.disconnect();
+    } catch (err) {
+      console.error(err);
+    }
     await api.logout();
     setUser(null);
   };

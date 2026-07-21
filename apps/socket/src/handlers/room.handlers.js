@@ -41,6 +41,34 @@ export const registerRoomHandlers = (io, socket) => {
     socket.to(roomId).emit('room:user_left', { userId: socket.user?.userId });
   });
 
+  socket.on('room:kick_user', async ({ roomId, targetUserId }) => {
+    const userId = socket.user?.userId;
+    if (!userId) return;
+
+    try {
+      // Verify the requester is the owner
+      const room = await prisma.room.findUnique({ where: { id: roomId } });
+      if (!room || room.ownerId !== userId) {
+        return socket.emit('error', { message: 'Not authorized to kick users' });
+      }
+
+      // Find the target user's socket in the room
+      const sockets = await io.in(roomId).fetchSockets();
+      const targetSocket = sockets.find(s => s.user?.userId === targetUserId);
+
+      if (targetSocket) {
+        // Emit kicked event to the target user
+        targetSocket.emit('room:kicked', { roomId });
+        // Force them to leave the socket room
+        targetSocket.leave(roomId);
+        // Notify others that the user left
+        io.to(roomId).emit('room:user_left', { userId: targetUserId });
+      }
+    } catch (error) {
+      console.error('Error kicking user:', error);
+    }
+  });
+
   // Handle sudden disconnects
   socket.on('disconnecting', () => {
     const userId = socket.user?.userId;

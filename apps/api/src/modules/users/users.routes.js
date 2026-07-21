@@ -8,16 +8,24 @@ import {
   setupTwoFactor,
   verifyTwoFactor,
   disableTwoFactor,
-  deleteAccount
+  deleteAccount,
+  searchUsers
 } from './users.controller.js';
+
+import * as usersController from './users.controller.js';
 
 const router = Router();
 
 router.use(requireAuth);
 
 router.get('/me', getMe);
+router.get('/search', usersController.searchUsers);
+router.get('/profile/:username', usersController.getPublicProfile);
 router.patch('/me', updateMe);
 router.delete('/me', deleteAccount);
+
+router.post('/:userId/block', usersController.blockUser);
+router.delete('/:userId/block', usersController.unblockUser);
 
 router.get('/sessions', getSessions);
 router.delete('/sessions/:id', revokeDeviceSession);

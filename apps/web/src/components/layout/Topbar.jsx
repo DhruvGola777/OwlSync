@@ -2,6 +2,7 @@ import React from 'react';
 import { Bell, Search, User } from 'lucide-react';
 import { useAuth } from '../../providers/AuthProvider';
 import AvatarDisplay from '../ui/AvatarDisplay';
+import { FriendsMenu } from './FriendsMenu';
 
 export const Topbar = () => {
   const { user } = useAuth();
@@ -27,6 +28,7 @@ export const Topbar = () => {
         </form>
         
         <div className="flex items-center gap-x-4 lg:gap-x-6">
+          <FriendsMenu />
           <button type="button" className="-m-2.5 p-2.5 text-slate-400 hover:text-slate-500 transition-colors">
             <span className="sr-only">View notifications</span>
             <Bell className="h-6 w-6" aria-hidden="true" />

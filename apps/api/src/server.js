@@ -5,6 +5,7 @@ import { env } from './config/env.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import usersRoutes from './modules/users/users.routes.js';
 import roomRoutes from './modules/rooms/rooms.routes.js';
+import friendsRoutes from './modules/friends/friends.routes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import AppError from './utils/AppError.js';
 
@@ -23,6 +24,7 @@ app.use(cookieParser());
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/rooms', roomRoutes);
+app.use('/api/friends', friendsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

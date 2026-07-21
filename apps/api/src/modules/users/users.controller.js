@@ -7,7 +7,11 @@ import {
   generateTwoFactorSecret,
   verifyTwoFactorToken,
   updateUserTwoFactor,
-  deleteUser
+  deleteUser,
+  searchUsers as searchUsersService,
+  getUserProfile as getUserProfileService,
+  blockUser as blockUserService,
+  unblockUser as unblockUserService
 } from './users.service.js';
 
 export const getMe = async (req, res, next) => {
@@ -100,6 +104,48 @@ export const deleteAccount = async (req, res, next) => {
     res.clearCookie('token', { path: '/' });
     res.clearCookie('refreshToken', { path: '/' });
     res.status(200).json({ message: 'Account deleted successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const searchUsers = async (req, res, next) => {
+  try {
+    const { q } = req.query;
+    if (!q) return res.status(200).json({ users: [] });
+    const users = await searchUsersService(q, req.user.id);
+    res.status(200).json({ users });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getPublicProfile = async (req, res, next) => {
+  try {
+    const { username } = req.params;
+    const profile = await getUserProfileService(username, req.user.id);
+    if (!profile) throw new AppError('User not found', 404);
+    res.status(200).json({ profile });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const blockUser = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    await blockUserService(req.user.id, userId);
+    res.status(200).json({ message: 'User blocked successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const unblockUser = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    await unblockUserService(req.user.id, userId);
+    res.status(200).json({ message: 'User unblocked successfully' });
   } catch (err) {
     next(err);
   }

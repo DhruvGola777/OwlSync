@@ -21,7 +21,9 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshError) {
         // If refresh fails, they really are logged out
-        window.location.href = '/login';
+        if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+          window.location.href = '/login';
+        }
         return Promise.reject(refreshError);
       }
     }
@@ -69,6 +71,24 @@ export const api = {
       return res.data;
     } catch (error) {
       throw new Error(error.response?.data?.error || 'Failed to update profile');
+    }
+  },
+
+  async searchUsers(query) {
+    try {
+      const res = await apiClient.get(`/users/search?q=${encodeURIComponent(query)}`);
+      return res.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to search users');
+    }
+  },
+
+  async getPublicProfile(username) {
+    try {
+      const res = await apiClient.get(`/users/profile/${encodeURIComponent(username)}`);
+      return res.data.profile;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to load profile');
     }
   },
 
@@ -259,6 +279,70 @@ export const api = {
       return res.data;
     } catch (error) {
       throw new Error(extractError(error, 'Failed to delete room'));
+    }
+  },
+
+  // Friends API
+  async getFriends() {
+    try {
+      const res = await apiClient.get('/friends');
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to fetch friends'));
+    }
+  },
+
+  async getFriendRequests() {
+    try {
+      const res = await apiClient.get('/friends/requests');
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to fetch friend requests'));
+    }
+  },
+
+  async sendFriendRequest(username) {
+    try {
+      const res = await apiClient.post('/friends/request', { username });
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to send friend request'));
+    }
+  },
+
+  async acceptFriendRequest(requestId) {
+    try {
+      const res = await apiClient.post(`/friends/${requestId}/accept`);
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to accept friend request'));
+    }
+  },
+
+  async declineFriendRequest(requestId) {
+    try {
+      const res = await apiClient.post(`/friends/${requestId}/decline`);
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to decline friend request'));
+    }
+  },
+
+  async blockUser(userId) {
+    try {
+      const res = await apiClient.post(`/users/${userId}/block`);
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to block user'));
+    }
+  },
+
+  async unblockUser(userId) {
+    try {
+      const res = await apiClient.delete(`/users/${userId}/block`);
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to unblock user'));
     }
   }
 };

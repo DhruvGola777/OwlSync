@@ -42,6 +42,13 @@ export const RoomView = () => {
     if (window.confirm("Are you sure you want to kick this user?")) {
       try {
         await api.kickMember(room.id, targetUserId);
+        
+        // Notify socket server to force disconnect the user
+        const socket = socketService.getSocket();
+        if (socket) {
+          socket.emit('room:kick_user', { roomId: room.id, targetUserId });
+        }
+
         // Optimistically update the UI
         setRoom(prev => ({
           ...prev,
@@ -59,7 +66,34 @@ export const RoomView = () => {
     const fetchRoomAndConnect = async () => {
       try {
         const res = await api.getRoom(id);
-        setRoom(res.room);
+        let fetchedRoom = res.room;
+        
+        // Check if the current user is a member
+        const isMember = fetchedRoom.members.some(m => m.user.id === user?.id);
+
+        if (!isMember) {
+          if (fetchedRoom.isProtected) {
+            // User is not a member and room is protected. Redirect back.
+            alert("This room is password protected. Please join from the dashboard.");
+            navigate('/');
+            return;
+          } else {
+            // Auto-join public room
+            try {
+              await api.joinRoom(id, '');
+              // Refetch room to get updated members list
+              const updatedRes = await api.getRoom(id);
+              fetchedRoom = updatedRes.room;
+            } catch (joinErr) {
+              console.error('Failed to auto-join public room', joinErr);
+              alert(joinErr.message || 'Failed to join room');
+              navigate('/');
+              return;
+            }
+          }
+        }
+
+        setRoom(fetchedRoom);
 
         // Connect to socket and join room
         socket = socketService.connect(token);
@@ -78,12 +112,24 @@ export const RoomView = () => {
         });
 
         // Listen for presence events
-        socket.on('room:user_joined', ({ userId }) => {
+        socket.on('room:user_joined', async ({ userId }) => {
           setActiveUsers(prev => [...new Set([...prev, userId])]);
+          // Re-fetch room data to get the new member's info if they just joined
+          try {
+            const updatedRes = await api.getRoom(id);
+            setRoom(updatedRes.room);
+          } catch (e) {
+            console.error('Error refetching room on user join', e);
+          }
         });
 
         socket.on('room:user_left', ({ userId }) => {
           setActiveUsers(prev => prev.filter(uid => uid !== userId));
+        });
+
+        socket.on('room:kicked', () => {
+          alert('You have been kicked from the room.');
+          navigate('/');
         });
 
       } catch (err) {
@@ -103,6 +149,7 @@ export const RoomView = () => {
         socket.off('room:active_users');
         socket.off('room:user_joined');
         socket.off('room:user_left');
+        socket.off('room:kicked');
       }
     };
   }, [id, navigate, token]);
