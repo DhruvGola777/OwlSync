@@ -64,4 +64,12 @@ export const registerEditorHandlers = (io, socket) => {
      socket.to(`editor:${roomId}`).emit('editor:language_change', { language });
      prisma.room.update({ where: { id: roomId }, data: { language }}).catch(console.error);
   });
+
+  socket.on('editor:awareness', ({ roomId, update }) => {
+    socket.to(`editor:${roomId}`).emit('editor:awareness', { update });
+  });
+
+  socket.on('editor:request_awareness', ({ roomId }) => {
+    socket.to(`editor:${roomId}`).emit('editor:request_awareness');
+  });
 };

@@ -8,6 +8,7 @@ import roomRoutes from './modules/rooms/rooms.routes.js';
 import friendsRoutes from './modules/friends/friends.routes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import AppError from './utils/AppError.js';
+import { connectRabbitMQ, publishToQueue } from './config/rabbitmq.js';
 
 const app = express();
 const PORT = env.PORT;
@@ -31,6 +32,16 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'owlsync-api' });
 });
 
+// Phase 2 RabbitMQ Test Route
+app.get('/api/test-email', async (req, res) => {
+  await publishToQueue('email_queue', {
+    to: 'tester@owlsync.com',
+    subject: 'Phase 2 Test Email',
+    text: 'If you are reading this in the terminal, RabbitMQ is working!'
+  });
+  res.json({ message: 'Task queued! Check your terminal to see the worker pick it up.' });
+});
+
 // Handle unhandled routes (404)
 app.all('*', (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
@@ -39,6 +50,12 @@ app.all('*', (req, res, next) => {
 // Global error handler
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`🚀 API Server running on http://localhost:${PORT}`);
-});
+const startServer = async () => {
+  await connectRabbitMQ();
+  
+  app.listen(PORT, () => {
+    console.log(`🚀 API Server running on http://localhost:${PORT}`);
+  });
+};
+
+startServer();

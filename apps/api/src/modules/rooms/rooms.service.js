@@ -106,15 +106,25 @@ export const joinRoom = async ({ roomId, userId, password }) => {
     }
   }
 
-  const member = await prisma.roomMember.create({
-    data: {
-      roomId,
-      userId,
-      role: 'MEMBER'
+  try {
+    const member = await prisma.roomMember.create({
+      data: {
+        roomId,
+        userId,
+        role: 'MEMBER'
+      }
+    });
+    return { message: 'Successfully joined the room', member };
+  } catch (error) {
+    if (error.code === 'P2002') {
+      // Race condition fallback: already joined
+      const existingMember = await prisma.roomMember.findUnique({
+        where: { roomId_userId: { roomId, userId } }
+      });
+      return { message: 'Already joined', member: existingMember };
     }
-  });
-
-  return { message: 'Successfully joined the room', member };
+    throw error;
+  }
 };
 
 export const leaveRoom = async (roomId, userId) => {

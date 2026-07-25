@@ -5,6 +5,11 @@ import path from 'path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  server: {
+    port: 3000,
+    strictPort: false,
+    host: '127.0.0.1'
+  },
   resolve: {
     alias: (() => {
       // monorepo: monaco-editor is installed at the workspace root node_modules.
