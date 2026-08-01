@@ -1,20 +1,20 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, FolderOpen, Settings as SettingsIcon, LogOut, Code2, Home } from 'lucide-react';
+import { LayoutDashboard, Users, FolderOpen, Settings as SettingsIcon, LogOut, Code2, Home, Globe } from 'lucide-react';
 import { useAuth } from '../../providers/AuthProvider';
 
 const navItems = [
-  { name: 'Dashboard', href: '/dashboard', icon: Home },
-  { name: 'Rooms', href: '/rooms', icon: FolderOpen },
+  { name: 'Projects', href: '/projects', icon: FolderOpen },
+  { name: 'Rooms', href: '/rooms', icon: Globe },
   { name: 'Team', href: '/team', icon: Users },
   { name: 'Settings', href: '/settings', icon: SettingsIcon },
 ];
 
-export const Sidebar = () => {
+export const Sidebar = ({ isSidebarOpen }) => {
   const { logout } = useAuth();
 
   return (
-    <div className="flex h-full flex-col bg-slate-900 w-64 border-r border-slate-800 text-slate-300 shadow-xl transition-all duration-300">
+    <div className={`flex h-full flex-col bg-slate-900 border-r border-slate-800 text-slate-300 shadow-xl transition-all duration-300 overflow-hidden ${isSidebarOpen ? 'w-64' : 'w-0 border-r-0'}`}>
       <div className="flex h-16 shrink-0 items-center px-6 gap-3 border-b border-slate-800 bg-slate-950/50">
         <Code2 className="h-8 w-8 text-indigo-500" />
         <span className="text-xl font-bold text-white tracking-tight">OwlSync</span>

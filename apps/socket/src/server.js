@@ -7,6 +7,9 @@ import { requireSocketAuth } from './middlewares/auth.js';
 import { registerRoomHandlers } from './handlers/room.handlers.js';
 import { registerChatHandlers } from './handlers/chat.handlers.js';
 import { registerEditorHandlers } from './handlers/editor.handlers.js';
+import { registerNotesHandlers } from './handlers/notes.handlers.js';
+import { registerWhiteboardHandlers } from './handlers/whiteboard.handlers.js';
+import { registerActivityHandlers } from './handlers/activity.handlers.js';
 import { PrismaClient } from '@prisma/client';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { connectRedis, pubClient, subClient } from './config/redis.js';
@@ -59,6 +62,9 @@ io.on('connection', async (socket) => {
   registerRoomHandlers(io, socket);
   registerChatHandlers(io, socket);
   registerEditorHandlers(io, socket);
+  registerNotesHandlers(io, socket);
+  registerWhiteboardHandlers(io, socket);
+  registerActivityHandlers(io, socket);
 
   socket.on('disconnect', async () => {
     console.log(`User disconnected: ${userId} (Socket: ${socket.id})`);

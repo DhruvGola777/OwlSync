@@ -90,6 +90,11 @@ export const registerRoomHandlers = (io, socket) => {
     }
   });
 
+  socket.on('project:files_changed', ({ roomId }) => {
+    // Tell everyone else in the room that the file tree changed so they can refresh
+    socket.to(roomId).emit('project:files_changed');
+  });
+
   // Handle sudden disconnects
   socket.on('disconnecting', () => {
     const userId = socket.user?.userId;

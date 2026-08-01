@@ -6,6 +6,7 @@ import authRoutes from './modules/auth/auth.routes.js';
 import usersRoutes from './modules/users/users.routes.js';
 import roomRoutes from './modules/rooms/rooms.routes.js';
 import friendsRoutes from './modules/friends/friends.routes.js';
+import projectsRoutes from './modules/projects/projects.routes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import AppError from './utils/AppError.js';
 import { connectRabbitMQ, publishToQueue } from './config/rabbitmq.js';
@@ -26,6 +27,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/friends', friendsRoutes);
+app.use('/api/projects', projectsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

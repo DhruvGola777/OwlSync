@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
@@ -7,6 +7,7 @@ import { useAuth } from '../../providers/AuthProvider';
 
 export const DashboardLayout = () => {
   const { user } = useAuth();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   useEffect(() => {
     if (user) {
@@ -19,9 +20,9 @@ export const DashboardLayout = () => {
   }, [user]);
   return (
     <div className="flex h-screen w-full bg-slate-50 overflow-hidden font-sans">
-      <Sidebar />
+      <Sidebar isSidebarOpen={isSidebarOpen} />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Topbar />
+        <Topbar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
         <main className="flex-1 overflow-y-auto bg-slate-50 p-6 lg:p-8">
           <div className="mx-auto max-w-7xl h-full">
             <Outlet />

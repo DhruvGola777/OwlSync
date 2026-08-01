@@ -2,11 +2,13 @@ export const errorHandler = (err, req, res, next) => {
   err.statusCode = err.statusCode || 500;
   err.status = err.status || 'error';
 
-  import('fs').then(fs => {
-    const errorLog = `[${new Date().toISOString()}] Error 💥: ${err.stack || err}\n`;
-    try { fs.appendFileSync('api-error.log', errorLog); } catch (e) {}
-  });
-  console.error('Error 💥:', err);
+  if (err.name !== 'TokenExpiredError' && err.name !== 'JsonWebTokenError' && err.statusCode !== 401) {
+    import('fs').then(fs => {
+      const errorLog = `[${new Date().toISOString()}] Error 💥: ${err.stack || err}\n`;
+      try { fs.appendFileSync('api-error.log', errorLog); } catch (e) {}
+    });
+    console.error('Error 💥:', err);
+  }
 
   // Handle Zod validation errors
   if (err.name === 'ZodError') {

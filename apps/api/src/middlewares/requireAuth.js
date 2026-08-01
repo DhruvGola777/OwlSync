@@ -17,7 +17,7 @@ export const requireAuth = async (req, res, next) => {
     try {
       decoded = jwt.verify(token, JWT_SECRET);
     } catch (err) {
-      throw new AppError('Invalid token. Please log in again.', 401);
+      return next(err);
     }
 
     const currentUser = await findUserById(decoded.userId);

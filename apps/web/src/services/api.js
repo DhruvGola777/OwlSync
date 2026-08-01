@@ -291,6 +291,134 @@ export const api = {
     }
   },
 
+  // Projects
+  async getProjects() {
+    try {
+      const res = await apiClient.get(`/projects`);
+      return res.data.data.projects;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to fetch projects'));
+    }
+  },
+
+  async createProject(data) {
+    try {
+      const res = await apiClient.post(`/projects`, data);
+      return res.data.data.project;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to create project'));
+    }
+  },
+
+  async getProject(projectId) {
+    try {
+      const res = await apiClient.get(`/projects/${projectId}`);
+      return res.data.data.project;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to fetch project'));
+    }
+  },
+
+  async createFile(projectId, data) {
+    try {
+      const res = await apiClient.post(`/projects/${projectId}/files`, data);
+      return res.data.data.file;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to create file'));
+    }
+  },
+
+  async updateFile(projectId, fileId, content) {
+    try {
+      const res = await apiClient.put(`/projects/${projectId}/files/${fileId}`, { content });
+      return res.data.data.file;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to update file'));
+    }
+  },
+
+  async renameFileOrFolder(projectId, oldPath, newPath) {
+    try {
+      await apiClient.put(`/projects/${projectId}/files/rename`, { oldPath, newPath });
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to rename file or folder'));
+    }
+  },
+
+  async deleteFileOrFolder(projectId, path) {
+    try {
+      await apiClient.delete(`/projects/${projectId}/files?path=${encodeURIComponent(path)}`);
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to delete file or folder'));
+    }
+  },
+
+  // Legacy delete for single file by id if still used somewhere
+  async deleteFile(projectId, fileId) {
+    try {
+      await apiClient.delete(`/projects/${projectId}/files/${fileId}`);
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to delete file'));
+    }
+  },
+
+  // Notes API
+  async getNote(projectId) {
+    try {
+      const res = await apiClient.get(`/projects/${projectId}/notes`);
+      return res.data.data.note;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to fetch project note'));
+    }
+  },
+
+  async updateNote(projectId, content) {
+    try {
+      const res = await apiClient.put(`/projects/${projectId}/notes`, { content });
+      return res.data.data.note;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to update project note'));
+    }
+  },
+
+  // Whiteboard API
+  async getWhiteboard(projectId) {
+    try {
+      const res = await apiClient.get(`/projects/${projectId}/whiteboard`);
+      return res.data.data.whiteboard;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to fetch project whiteboard'));
+    }
+  },
+
+  async updateWhiteboard(projectId, state) {
+    try {
+      const res = await apiClient.put(`/projects/${projectId}/whiteboard`, { state });
+      return res.data.data.whiteboard;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to update project whiteboard'));
+    }
+  },
+
+  // Activities API
+  async getActivities(projectId) {
+    try {
+      const res = await apiClient.get(`/projects/${projectId}/activities`);
+      return res.data.data.activities;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to fetch activities'));
+    }
+  },
+
+  async createActivity(projectId, data) {
+    try {
+      const res = await apiClient.post(`/projects/${projectId}/activities`, data);
+      return res.data.data.activity;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to log activity'));
+    }
+  },
+
   // Friends API
   async getFriends() {
     try {

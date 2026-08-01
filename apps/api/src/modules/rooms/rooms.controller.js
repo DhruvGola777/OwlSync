@@ -2,11 +2,12 @@ import * as roomService from './rooms.service.js';
 
 export const createRoom = async (req, res, next) => {
   try {
-    const { name, description, password } = req.body;
+    const { name, description, password, projectId } = req.body;
     const room = await roomService.createRoom({
       name,
       description,
       password,
+      projectId,
       ownerId: req.user.id
     });
     res.status(201).json({ message: 'Room created successfully', room });

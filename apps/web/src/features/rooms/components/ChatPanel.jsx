@@ -8,7 +8,7 @@ import { socketService } from '../../../services/socket';
 import { useAuth } from '../../../providers/AuthProvider';
 import AvatarDisplay from '../../../components/ui/AvatarDisplay';
 
-export const ChatPanel = ({ roomId, onClose }) => {
+export const ChatPanel = ({ roomId, onClose, hideHeader }) => {
   const { user } = useAuth();
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
@@ -122,19 +122,21 @@ export const ChatPanel = ({ roomId, onClose }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-900 relative">
+    <div className="flex flex-col h-full bg-[#1e1e1e] relative">
       {/* Header */}
-      <div className="p-4 border-b border-white/10 flex items-center justify-between bg-gray-900/50">
-        <h2 className="text-sm font-semibold text-white uppercase tracking-wider">Room Chat</h2>
-        {onClose && (
-          <button 
-            onClick={onClose}
-            className="p-1 text-gray-400 hover:text-white rounded-md"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )}
-      </div>
+      {!hideHeader && (
+        <div className="p-4 border-b border-white/10 flex items-center justify-between bg-gray-900/50">
+          <h2 className="text-sm font-semibold text-white uppercase tracking-wider">Room Chat</h2>
+          {onClose && (
+            <button 
+              onClick={onClose}
+              className="p-1 text-gray-400 hover:text-white rounded-md"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20 scrollbar-track-transparent">

@@ -4,7 +4,7 @@ import AppError from '../../utils/AppError.js';
 
 const prisma = new PrismaClient();
 
-export const createRoom = async ({ name, description, password, ownerId }) => {
+export const createRoom = async ({ name, description, password, ownerId, projectId }) => {
   let hashedPassword = null;
   if (password) {
     hashedPassword = await bcryptjs.hash(password, 10);
@@ -16,6 +16,7 @@ export const createRoom = async ({ name, description, password, ownerId }) => {
       description,
       password: hashedPassword,
       ownerId,
+      projectId,
       members: {
         create: {
           userId: ownerId,
@@ -66,6 +67,9 @@ export const getRoomById = async (roomId) => {
         include: {
           user: { select: { id: true, username: true, name: true, avatarUrl: true, status: true } }
         }
+      },
+      project: {
+        include: { files: true }
       }
     }
   });

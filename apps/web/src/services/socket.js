@@ -48,6 +48,12 @@ class SocketService {
     }
   }
 
+  notifyFilesChanged(roomId) {
+    if (this.socket && roomId) {
+      this.socket.emit('project:files_changed', { roomId });
+    }
+  }
+
   getSocket() {
     return this.socket;
   }
