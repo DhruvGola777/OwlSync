@@ -4,14 +4,22 @@ import { env } from './env.js';
 let connection = null;
 let channel = null;
 
-export const connectRabbitMQ = async () => {
-  try {
-    connection = await amqp.connect(env.RABBITMQ_URL);
-    channel = await connection.createChannel();
-    console.log('✅ Connected to RabbitMQ (API)');
-  } catch (error) {
-    console.error('❌ Failed to connect to RabbitMQ:', error);
+export const connectRabbitMQ = async (retries = 5, delay = 5000) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      connection = await amqp.connect(env.RABBITMQ_URL);
+      channel = await connection.createChannel();
+      console.log('✅ Connected to RabbitMQ (API)');
+      return;
+    } catch (error) {
+      console.error(`❌ Failed to connect to RabbitMQ (Attempt ${i + 1}/${retries}):`, error.message);
+      if (i < retries - 1) {
+        console.log(`Retrying in ${delay / 1000} seconds...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
   }
+  console.error('❌ Could not connect to RabbitMQ after multiple attempts.');
 };
 
 export const getChannel = () => {

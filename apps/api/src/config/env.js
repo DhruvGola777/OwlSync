@@ -18,4 +18,6 @@ export const env = {
   GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
   REDIS_URL: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
   RABBITMQ_URL: process.env.RABBITMQ_URL || 'amqp://127.0.0.1:5672',
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
 };

@@ -22,13 +22,50 @@ export const registerRoomHandlers = (io, socket) => {
       // Join the socket.io room named after the roomId
       socket.join(roomId);
 
-      // Notify others in the room
+      // Send the current list of online users to ALL users in the room
+      const sockets = await io.in(roomId).fetchSockets();
+      const activeUsers = [...new Set(sockets.map(s => s.user?.userId).filter(Boolean))];
+      io.to(roomId).emit('room:active_users', { activeUsers });
       socket.to(roomId).emit('room:user_joined', { userId });
 
-      // Send the current list of online users to the joining user
-      const sockets = await io.in(roomId).fetchSockets();
-      const activeUsers = sockets.map(s => s.user?.userId).filter(Boolean);
-      socket.emit('room:active_users', { activeUsers });
+      // Record USER_JOINED activity in project session timeline
+      try {
+        const room = await prisma.room.findUnique({
+          where: { id: roomId },
+          select: { id: true, projectId: true }
+        });
+
+        if (room?.projectId) {
+          socket.join(room.projectId);
+          socket.join(`project:${room.projectId}`);
+          socket.join(`room:${room.projectId}`);
+
+          const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { id: true, username: true, name: true, avatarUrl: true }
+          });
+
+          if (user) {
+            const userName = user.name || user.username || 'Someone';
+            const activity = await prisma.activity.create({
+              data: {
+                projectId: room.projectId,
+                userId: user.id,
+                type: 'USER_JOINED',
+                description: `${userName} joined the session`,
+                metadata: { roomId }
+              },
+              include: {
+                user: { select: { id: true, username: true, name: true, avatarUrl: true } }
+              }
+            });
+
+            io.to(roomId).emit('project:activity', activity);
+          }
+        }
+      } catch (actErr) {
+        console.error('Failed to log USER_JOINED activity:', actErr);
+      }
 
     } catch (error) {
       console.error('Error joining room:', error);
@@ -36,9 +73,14 @@ export const registerRoomHandlers = (io, socket) => {
     }
   });
 
-  socket.on('room:leave', ({ roomId }) => {
+  socket.on('room:leave', async ({ roomId }) => {
     socket.leave(roomId);
     socket.to(roomId).emit('room:user_left', { userId: socket.user?.userId });
+    try {
+      const sockets = await io.in(roomId).fetchSockets();
+      const activeUsers = [...new Set(sockets.map(s => s.user?.userId).filter(Boolean))];
+      io.to(roomId).emit('room:active_users', { activeUsers });
+    } catch (e) {}
   });
 
   socket.on('room:kick_user', async ({ roomId, targetUserId }) => {

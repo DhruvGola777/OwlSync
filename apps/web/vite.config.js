@@ -6,7 +6,7 @@ import path from 'path'
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5173,
+    port: 3000,
     strictPort: false,
     host: '127.0.0.1'
   },
@@ -22,6 +22,24 @@ export default defineConfig({
   },
   optimizeDeps: {
     // Pre-bundle Monaco and related packages so Vite can resolve deep imports
-    include: ['@monaco-editor/react', 'y-monaco', 'monaco-editor/esm/vs/editor/editor.api.js']
+    include: ['@monaco-editor/react', 'y-monaco', 'monaco-editor/esm/vs/editor/editor.api.js', 'xterm', 'xterm-addon-fit']
+  },
+  build: {
+    chunkSizeWarningLimit: 2000,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/monaco-editor') || id.includes('node_modules/@monaco-editor')) {
+            return 'monaco-vendor';
+          }
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router-dom')) {
+            return 'react-vendor';
+          }
+          if (id.includes('node_modules/lucide-react') || id.includes('node_modules/react-icons')) {
+            return 'icons-vendor';
+          }
+        }
+      }
+    }
   }
 })

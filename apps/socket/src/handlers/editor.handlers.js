@@ -1,5 +1,6 @@
 import * as Y from 'yjs';
 import { PrismaClient } from '@prisma/client';
+import { dockerService } from '../services/docker.service.js';
 
 const prisma = new PrismaClient();
 const docs = new Map();
@@ -9,14 +10,58 @@ function scheduleSave(roomId, doc) {
   if (saveTimeouts.has(roomId)) {
     clearTimeout(saveTimeouts.get(roomId));
   }
-  saveTimeouts.set(roomId, setTimeout(() => {
-    const code = doc.getText('monaco').toString();
-    prisma.room.update({
-      where: { id: roomId },
-      data: { code }
-    }).catch(err => console.error('Failed to save code to DB', err));
+  saveTimeouts.set(roomId, setTimeout(async () => {
+    try {
+      const room = await prisma.room.findUnique({ 
+        where: { id: roomId }, 
+        include: { project: { include: { files: true } } }
+      });
+      
+      if (room && room.project) {
+        const projectId = room.project.id;
+        let container = null;
+        try {
+           container = await dockerService.getOrCreateContainer(projectId);
+        } catch (e) {
+           // Container might not be running, that's fine
+        }
+
+        const updates = [];
+        for (const file of room.project.files) {
+          const textType = doc.getText(file.id);
+          if (textType) {
+            const content = textType.toString();
+            // Only update if content changed? Yjs getText will return the current content
+            // We just blind update for MVP
+            updates.push(
+              prisma.file.update({
+                where: { id: file.id },
+                data: { content }
+              })
+            );
+
+            if (container) {
+               await dockerService.writeToContainerFile(container, file.path, content).catch(console.error);
+            }
+          }
+        }
+        
+        if (updates.length > 0) {
+           await prisma.$transaction(updates);
+        }
+      } else {
+        // Legacy single-file mode
+        const code = doc.getText('monaco').toString();
+        await prisma.room.update({
+          where: { id: roomId },
+          data: { code }
+        });
+      }
+    } catch (err) {
+      console.error('Failed to save code to DB', err);
+    }
     saveTimeouts.delete(roomId);
-  }, 5000));
+  }, 3000));
 }
 
 export const registerEditorHandlers = (io, socket) => {
@@ -29,9 +74,23 @@ export const registerEditorHandlers = (io, socket) => {
       docs.set(roomId, doc);
       try {
         // Fetch initial code from DB
-        const room = await prisma.room.findUnique({ where: { id: roomId }});
-        if (room && room.code) {
-          doc.getText('monaco').insert(0, room.code);
+        const room = await prisma.room.findUnique({ 
+          where: { id: roomId },
+          include: { project: { include: { files: true } } }
+        });
+        
+        if (room) {
+          if (room.project) {
+            // Load all files into Yjs doc
+            room.project.files.forEach(file => {
+              if (file.content) {
+                doc.getText(file.id).insert(0, file.content);
+              }
+            });
+          } else if (room.code) {
+            // Legacy single file
+            doc.getText('monaco').insert(0, room.code);
+          }
         }
       } catch (err) {
         console.error('Failed to fetch room code for editor', err);

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../../services/api';
 import { useNavigate } from 'react-router-dom';
-import { Code2, Plus, Loader2, KeyRound } from 'lucide-react';
+import { Code2, Plus, Loader2, KeyRound, Trash2 } from 'lucide-react';
+import { useAuth } from '../../../providers/AuthProvider';
 
 export const RoomsPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [rooms, setRooms] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -85,6 +87,17 @@ export const RoomsPage = () => {
     }
   };
 
+  const handleDeleteRoom = async (e, roomId) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this room? This action cannot be undone.')) return;
+    try {
+      await api.deleteRoom(roomId);
+      setRooms(rooms.filter(r => r.id !== roomId));
+    } catch (err) {
+      alert(err.message || 'Failed to delete room');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -154,11 +167,22 @@ export const RoomsPage = () => {
                 <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <Code2 size={20} />
                 </div>
-                {room.password && (
-                  <div className="px-2 py-1 bg-amber-50 text-amber-700 text-xs font-medium rounded-md flex items-center gap-1">
-                    <KeyRound size={12} /> Protected
-                  </div>
-                )}
+                <div className="flex items-center gap-2">
+                  {room.password && (
+                    <div className="px-2 py-1 bg-amber-50 text-amber-700 text-xs font-medium rounded-md flex items-center gap-1">
+                      <KeyRound size={12} /> Protected
+                    </div>
+                  )}
+                  {room.ownerId === user?.id && (
+                    <button
+                      onClick={(e) => handleDeleteRoom(e, room.id)}
+                      title="Delete Room"
+                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
               </div>
               <h3 className="text-lg font-bold text-slate-800 mb-1 line-clamp-1">{room.name}</h3>
               <p className="text-slate-500 text-sm mb-4 line-clamp-2 min-h-10 flex-1">

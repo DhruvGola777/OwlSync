@@ -7,6 +7,7 @@ import usersRoutes from './modules/users/users.routes.js';
 import roomRoutes from './modules/rooms/rooms.routes.js';
 import friendsRoutes from './modules/friends/friends.routes.js';
 import projectsRoutes from './modules/projects/projects.routes.js';
+import aiRoutes from './modules/ai/ai.routes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import AppError from './utils/AppError.js';
 import { connectRabbitMQ, publishToQueue } from './config/rabbitmq.js';
@@ -28,6 +29,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/friends', friendsRoutes);
 app.use('/api/projects', projectsRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -54,7 +56,7 @@ app.use(errorHandler);
 
 const startServer = async () => {
   await connectRabbitMQ();
-  
+
   app.listen(PORT, () => {
     console.log(`🚀 API Server running on http://localhost:${PORT}`);
   });

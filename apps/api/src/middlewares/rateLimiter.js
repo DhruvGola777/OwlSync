@@ -5,23 +5,43 @@ import { env } from '../config/env.js';
 
 // Create a Redis client for rate limiting
 export const redisClient = createClient({
-  url: env.REDIS_URL
+  url: env.REDIS_URL,
+  socket: {
+    reconnectStrategy: (retries) => Math.min(retries * 50, 2000),
+    connectTimeout: 5000
+  }
 });
 
-redisClient.on('error', (err) => console.error('Redis Client Error', err));
-redisClient.connect().catch(console.error);
+redisClient.on('error', (err) => {
+  // Graceful log without unhandled crash
+  console.warn('Redis Client Notice:', err.message || err);
+});
 
-// Strict rate limiter for authentication endpoints
+redisClient.connect().catch((err) => {
+  console.warn('Redis initial connection deferred:', err.message || err);
+});
+
+// Strict rate limiter for authentication endpoints with resilient fallback
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Limit each IP to 10 failed requests per windowMs
+  max: 20, // Limit each IP per windowMs
   standardHeaders: true,
   legacyHeaders: false,
+  passOnStoreError: true, // Seamlessly continue if Redis store is temporarily connecting
   message: {
     success: false,
     message: 'Too many authentication attempts, please try again after 15 minutes'
   },
   store: new RedisStore({
-    sendCommand: (...args) => redisClient.sendCommand(args),
+    sendCommand: async (...args) => {
+      if (!redisClient.isOpen) {
+        return null;
+      }
+      try {
+        return await redisClient.sendCommand(args);
+      } catch (e) {
+        return null;
+      }
+    },
   }),
 });

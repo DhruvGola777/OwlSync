@@ -19,21 +19,27 @@ export const ChatPanel = ({ roomId, onClose, hideHeader }) => {
   const emojiPickerRef = useRef(null);
 
   useEffect(() => {
+    if (!roomId) return;
+
     const fetchMessages = async () => {
       try {
         const pastMessages = await api.getRoomMessages(roomId);
-        setMessages(pastMessages);
+        setMessages(Array.isArray(pastMessages) ? pastMessages : []);
       } catch (err) {
         console.error('Failed to fetch messages:', err);
       }
     };
     fetchMessages();
 
-    const socket = socketService.getSocket();
+    const socket = socketService.getSocket() || socketService.connect();
     if (!socket) return;
 
     const handleNewMessage = ({ message }) => {
-      setMessages(prev => [...prev, message]);
+      if (!message) return;
+      setMessages(prev => {
+        if (prev.some(m => m.id === message.id)) return prev;
+        return [...prev, message];
+      });
     };
 
     const handleTypingStart = ({ userId }) => {
@@ -82,7 +88,8 @@ export const ChatPanel = ({ roomId, onClose, hideHeader }) => {
   const handleInputChange = (e) => {
     setInputValue(e.target.value);
     
-    const socket = socketService.getSocket();
+    if (!roomId) return;
+    const socket = socketService.getSocket() || socketService.connect();
     if (socket) {
       socket.emit('chat:typing_start', { roomId });
       
@@ -97,11 +104,12 @@ export const ChatPanel = ({ roomId, onClose, hideHeader }) => {
   };
 
   const sendMessage = () => {
-    if (!inputValue.trim()) return;
+    const text = inputValue.trim();
+    if (!text || !roomId) return;
     
-    const socket = socketService.getSocket();
+    const socket = socketService.getSocket() || socketService.connect();
     if (socket) {
-      socket.emit('chat:send_message', { roomId, content: inputValue.trim() });
+      socket.emit('chat:send_message', { roomId, content: text });
       socket.emit('chat:typing_stop', { roomId });
     }
     
@@ -146,18 +154,21 @@ export const ChatPanel = ({ roomId, onClose, hideHeader }) => {
           </div>
         ) : (
           messages.map((msg, idx) => {
-            const isMe = msg.user.id === user?.id;
+            const sender = msg.user || {};
+            const isMe = (sender.id || msg.userId) === user?.id;
+            const senderName = isMe ? 'You' : (sender.name || sender.username || 'User');
+            
             return (
               <div key={msg.id || idx} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                 <div className="flex items-center gap-2 mb-1">
                   {!isMe && (
-                    <AvatarDisplay avatarUrl={msg.user.avatarUrl} name={msg.user.name || msg.user.username} size={20} />
+                    <AvatarDisplay avatarUrl={sender.avatarUrl} name={sender.name || sender.username} size={20} />
                   )}
                   <span className="text-xs font-medium text-gray-400">
-                    {isMe ? 'You' : (msg.user.name || msg.user.username)}
+                    {senderName}
                   </span>
                   <span className="text-[10px] text-gray-500">
-                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                   </span>
                 </div>
                 <div className={`px-3 py-2 rounded-xl max-w-[90%] text-sm ${isMe ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white/10 text-gray-200 rounded-tl-none'}`}>
@@ -192,6 +203,7 @@ export const ChatPanel = ({ roomId, onClose, hideHeader }) => {
         )}
         <div className="flex items-end gap-2 bg-gray-950 rounded-xl border border-white/10 p-2 focus-within:border-indigo-500/50 focus-within:ring-1 focus-within:ring-indigo-500/50 transition-all">
           <button 
+            type="button"
             className="p-2 text-gray-400 hover:text-indigo-400 transition-colors"
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
           >
@@ -208,6 +220,7 @@ export const ChatPanel = ({ roomId, onClose, hideHeader }) => {
           />
           
           <button 
+            type="button"
             onClick={sendMessage}
             disabled={!inputValue.trim()}
             className="p-2 text-indigo-500 hover:text-indigo-400 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"

@@ -22,10 +22,11 @@ export const registerChatHandlers = (io, socket) => {
         }
       });
 
-      // Broadcast the new message to everyone in the room (including sender, or sender can do optimistic updates)
-      // We'll broadcast to the room so everyone gets it. 
-      // If we use io.to(roomId), the sender also gets it.
+      // Broadcast to room
       io.to(roomId).emit('chat:new_message', { message });
+      if (!socket.rooms.has(roomId)) {
+        socket.emit('chat:new_message', { message });
+      }
 
     } catch (error) {
       console.error('Error saving/sending message:', error);

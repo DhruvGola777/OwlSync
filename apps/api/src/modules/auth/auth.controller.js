@@ -169,7 +169,7 @@ export const verifyEmail = async (req, res, next) => {
     await verifyUserEmail(user.id);
     
     // Redirect to frontend login with a success parameter
-    res.redirect('http://localhost:5173/login?verified=true');
+    res.redirect('http://localhost:3000/login?verified=true');
   } catch (err) {
     next(err);
   }
@@ -207,7 +207,7 @@ export const requestMagicLink = async (req, res, next) => {
     if (!user) throw new AppError('User not found', 404);
 
     const { token } = await generateVerificationToken(email, 'MAGIC_LINK');
-    const link = `http://localhost:5173/auth/magic-link?token=${token}`;
+    const link = `http://localhost:3000/auth/magic-link?token=${token}`;
     
     await sendEmail(email, 'Your Magic Link', `<p>Click <a href="${link}">here</a> to login.</p>`);
     res.status(200).json({ message: 'Magic link sent' });
@@ -247,7 +247,7 @@ export const requestPasswordReset = async (req, res, next) => {
     }
 
     const { token } = await generateVerificationToken(email, 'PASSWORD_RESET');
-    const link = `http://localhost:5173/auth/reset-password?token=${token}`;
+    const link = `http://localhost:3000/auth/reset-password?token=${token}`;
     
     await sendEmail(email, 'Password Reset', `<p>Click <a href="${link}">here</a> to reset your password.</p>`);
     res.status(200).json({ message: 'If an account exists, a reset link was sent' });
@@ -398,7 +398,7 @@ export const oauthCallback = async (req, res, next) => {
     });
 
     setAuthCookies(res, session.accessToken, session.refreshToken);
-    res.redirect('http://localhost:5173/dashboard');
+    res.redirect('http://localhost:3000/dashboard');
   } catch (err) {
     next(err);
   }

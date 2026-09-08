@@ -285,7 +285,7 @@ export const api = {
   async getRoomMessages(roomId) {
     try {
       const res = await apiClient.get(`/rooms/${roomId}/messages`);
-      return res.data.messages;
+      return res.data.messages || [];
     } catch (error) {
       throw new Error(extractError(error, 'Failed to fetch room messages'));
     }
@@ -480,6 +480,140 @@ export const api = {
       return res.data;
     } catch (error) {
       throw new Error(extractError(error, 'Failed to unblock user'));
+    }
+  },
+
+  // AI Assistant APIs
+  async aiChat(data) {
+    try {
+      const res = await apiClient.post('/ai/chat', data);
+      return res.data.data.response;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to get AI response'));
+    }
+  },
+
+  async aiExplain(data) {
+    try {
+      const res = await apiClient.post('/ai/explain', data);
+      return res.data.data.response;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to explain code'));
+    }
+  },
+
+  async aiRefactor(data) {
+    try {
+      const res = await apiClient.post('/ai/refactor', data);
+      return res.data.data.response;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to refactor code'));
+    }
+  },
+
+  async aiGenerateTests(data) {
+    try {
+      const res = await apiClient.post('/ai/generate-tests', data);
+      return res.data.data.response;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to generate tests'));
+    }
+  },
+
+  async aiDetectBugs(data) {
+    try {
+      const res = await apiClient.post('/ai/detect-bugs', data);
+      return res.data.data.response;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to detect bugs'));
+    }
+  },
+
+  async aiSummarizeSession(data) {
+    try {
+      const res = await apiClient.post('/ai/summarize-session', data);
+      return res.data.data.response;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to summarize session'));
+    }
+  },
+
+  async generateCommitMessage({ files = [], diffSummary = '' }) {
+    try {
+      const res = await apiClient.post('/ai/commit-message', { files, diffSummary });
+      return res.data.data.commitMessage;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to generate commit message'));
+    }
+  },
+
+  async streamAgentSession({
+    projectId,
+    prompt,
+    activeFile,
+    selectedCode,
+    contextFiles = [],
+    history = [],
+    onEvent,
+    onError,
+    onComplete
+  }) {
+    try {
+      const response = await fetch(`${API_URL}/ai/agent/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          projectId,
+          prompt,
+          activeFile,
+          selectedCode,
+          contextFiles,
+          history
+        })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText || 'Failed to start agent stream');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data: ')) continue;
+          const dataStr = trimmed.replace(/^data: /, '');
+
+          if (dataStr === '[DONE]') {
+            onComplete?.();
+            return;
+          }
+
+          try {
+            const event = JSON.parse(dataStr);
+            onEvent?.(event);
+          } catch (e) {
+            console.error('Failed to parse SSE event:', dataStr, e);
+          }
+        }
+      }
+      onComplete?.();
+    } catch (err) {
+      console.error('Agent stream error:', err);
+      onError?.(err);
     }
   }
 };

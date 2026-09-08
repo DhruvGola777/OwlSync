@@ -4,8 +4,8 @@ import { api } from '../../../services/api';
 import { socketService } from '../../../services/socket';
 import { useAuth } from '../../../providers/AuthProvider';
 import { 
-  VscFiles, VscSearch, VscSourceControl, VscTerminal, VscAccount, VscSettingsGear, VscBroadcast,
-  VscCheckAll, VscBell, VscFeedback, VscError, VscWarning, VscCommentDiscussion, VscOrganization, VscSignOut, VscTrash, VscNotebook, VscEdit, VscHistory, VscPlay
+  VscFiles, VscSearch, VscSourceControl, VscSettingsGear, VscBroadcast,
+  VscCheckAll, VscBell, VscError, VscWarning, VscCommentDiscussion, VscOrganization, VscSignOut, VscNotebook, VscEdit, VscHistory, VscPlay, VscClose
 } from 'react-icons/vsc';
 import AvatarDisplay from '../../../components/ui/AvatarDisplay';
 import { ChatPanel } from '../components/ChatPanel';
@@ -15,7 +15,16 @@ import { TimelinePanel } from '../components/TimelinePanel';
 import { CodeEditor } from '../components/CodeEditor';
 import { FileExplorer } from '../components/FileExplorer';
 import { SearchPanel } from '../components/SearchPanel';
+import { SourceControlPanel } from '../components/SourceControlPanel';
 import { EditorTabs } from '../components/EditorTabs';
+import { TerminalPanel } from '../components/TerminalPanel';
+import { AIPanel } from '../components/AIPanel';
+import { MembersPanel } from '../components/MembersPanel';
+import { VoiceControlBar } from '../components/VoiceControlBar';
+import { RecordingModal } from '../components/RecordingModal';
+import { useVoiceRoom } from '../hooks/useVoiceRoom';
+import { useSessionRecorder } from '../hooks/useSessionRecorder';
+import { Sparkles, Film, StopCircle } from 'lucide-react';
 
 export const RoomView = () => {
   const { id } = useParams();
@@ -30,22 +39,130 @@ export const RoomView = () => {
   const [activeUsers, setActiveUsers] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   
+  // WebRTC Voice & Session Screen Recorder Hooks
+  const voice = useVoiceRoom(isProjectMode ? null : id, user);
+  const recorder = useSessionRecorder(voice.localStream);
+  
   // VS Code Layout State
   const [activityBarTab, setActivityBarTab] = useState('explorer'); // 'explorer', 'search'
-  const [rightPanel, setRightPanel] = useState('none'); // 'chat', 'members', 'timeline', 'none'
+  const [rightPanel, setRightPanel] = useState('none'); // 'chat', 'members', 'timeline', 'ai', 'none'
   const [showWhiteboard, setShowWhiteboard] = useState(false);
   const [openFiles, setOpenFiles] = useState([]);
   const [activeFileId, setActiveFileId] = useState(null);
+  const [selectedCode, setSelectedCode] = useState('');
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showBottomPanel, setShowBottomPanel] = useState(false);
+  const [bottomPanelTab, setBottomPanelTab] = useState('terminal');
+  const [pendingDiff, setPendingDiff] = useState(null);
+  const [aiEditHistory, setAiEditHistory] = useState([]);
+
+  const handleAcceptDiff = async (diff) => {
+    const diffToAccept = diff || pendingDiff;
+    if (!diffToAccept) return;
+    const targetProjId = isProjectMode ? id : room?.project?.id;
+    const targetFile = openFiles.find(f => f.id === diffToAccept.fileId || f.path === diffToAccept.filePath || (f.name && diffToAccept.filePath?.endsWith(f.name)));
+    
+    if (targetFile && targetProjId) {
+      try {
+        const prevContent = diffToAccept.originalContent !== undefined ? diffToAccept.originalContent : targetFile.content;
+        await api.updateFile(targetProjId, targetFile.id, diffToAccept.newContent);
+
+        // Record undo snapshot in aiEditHistory
+        const snapshot = {
+          id: 'ai-snap-' + Date.now(),
+          fileId: targetFile.id,
+          filePath: targetFile.path,
+          fileName: targetFile.name,
+          previousContent: prevContent,
+          newContent: diffToAccept.newContent,
+          timestamp: new Date()
+        };
+        setAiEditHistory(prev => [snapshot, ...prev]);
+
+        setOpenFiles(prev => prev.map(f => f.id === targetFile.id ? { ...f, content: diffToAccept.newContent, updatedAt: new Date() } : f));
+        if (!isProjectMode) {
+          socketService.notifyFilesChanged(room.id);
+        }
+      } catch (err) {
+        console.error('Failed to accept diff:', err);
+      }
+    }
+    setPendingDiff(null);
+  };
+
+  const handleRejectDiff = async (diff) => {
+    const diffToReject = diff || pendingDiff;
+    if (!diffToReject) return;
+    const targetProjId = isProjectMode ? id : room?.project?.id;
+    const targetFile = openFiles.find(f => f.id === diffToReject.fileId || f.path === diffToReject.filePath || (f.name && diffToReject.filePath?.endsWith(f.name)));
+    
+    if (targetFile && targetProjId && diffToReject.originalContent !== undefined) {
+      try {
+        await api.updateFile(targetProjId, targetFile.id, diffToReject.originalContent);
+        setOpenFiles(prev => prev.map(f => f.id === targetFile.id ? { ...f, content: diffToReject.originalContent, updatedAt: new Date() } : f));
+        if (!isProjectMode) {
+          socketService.notifyFilesChanged(room.id);
+        }
+      } catch (err) {
+        console.error('Failed to revert rejected diff:', err);
+      }
+    }
+    setPendingDiff(null);
+  };
+
+  const handleRollback = async (snapshotOrFileId) => {
+    const snapshot = typeof snapshotOrFileId === 'object' && snapshotOrFileId?.fileId
+      ? snapshotOrFileId
+      : aiEditHistory.find(h => h.fileId === snapshotOrFileId || h.id === snapshotOrFileId);
+
+    if (!snapshot) return false;
+    const targetProjId = isProjectMode ? id : room?.project?.id;
+    if (!targetProjId) return false;
+
+    try {
+      await api.updateFile(targetProjId, snapshot.fileId, snapshot.previousContent);
+      setOpenFiles(prev => prev.map(f => f.id === snapshot.fileId ? { ...f, content: snapshot.previousContent, updatedAt: new Date() } : f));
+      setRoom(prev => {
+        if (!prev?.project?.files) return prev;
+        return {
+          ...prev,
+          project: {
+            ...prev.project,
+            files: prev.project.files.map(f => f.id === snapshot.fileId ? { ...f, content: snapshot.previousContent, updatedAt: new Date() } : f)
+          }
+        };
+      });
+
+      // Remove snapshot from history once rolled back
+      setAiEditHistory(prev => prev.filter(h => h.id !== snapshot.id));
+
+      if (!isProjectMode) {
+        socketService.notifyFilesChanged(room.id);
+      }
+      return true;
+    } catch (err) {
+      console.error('Failed to rollback AI changes:', err);
+      return false;
+    }
+  };
   
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem('owlsync_sidebar_width');
+    return saved ? parseInt(saved, 10) : 256;
+  });
+  
+  const [bottomPanelHeight, setBottomPanelHeight] = useState(() => {
+    const saved = localStorage.getItem('owlsync_bottom_panel_height');
     return saved ? parseInt(saved, 10) : 256;
   });
 
   useEffect(() => {
     localStorage.setItem('owlsync_sidebar_width', sidebarWidth);
   }, [sidebarWidth]);
+
+  useEffect(() => {
+    localStorage.setItem('owlsync_bottom_panel_height', bottomPanelHeight);
+  }, [bottomPanelHeight]);
 
   const activeSidebarRef = useRef(rightPanel);
 
@@ -78,6 +195,27 @@ export const RoomView = () => {
     document.body.style.cursor = 'col-resize';
   };
 
+  const handleBottomPanelResizeMouseDown = (e) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = bottomPanelHeight;
+    
+    const onMouseMove = (moveEvent) => {
+      const newHeight = Math.min(Math.max(100, startHeight - (moveEvent.clientY - startY)), 800);
+      setBottomPanelHeight(newHeight);
+    };
+    
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = 'default';
+    };
+    
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    document.body.style.cursor = 'row-resize';
+  };
+
   useEffect(() => {
     activeSidebarRef.current = rightPanel;
     if (rightPanel === 'chat') {
@@ -106,6 +244,20 @@ export const RoomView = () => {
         handleFileSelect(newFile);
       }
       
+      const userName = user?.name || user?.username || 'Someone';
+      const isFolder = data.name.endsWith('/') || data.path?.endsWith('.keep');
+      const itemTitle = isFolder ? `folder ${data.name.replace(/\/$/, '')}` : data.name;
+      api.createActivity(room.project.id, {
+        type: isFolder ? 'FOLDER_CREATED' : 'FILE_CREATED',
+        description: `${userName} created ${itemTitle}`,
+        metadata: { path: data.path || data.name }
+      }).then(activity => {
+        const socket = socketService.getSocket();
+        if (socket && activity) {
+          socket.emit('project:activity:new', { projectId: room.project.id, activity });
+        }
+      }).catch(console.error);
+
       if (!isProjectMode) {
         socketService.notifyFilesChanged(room.id);
       }
@@ -149,6 +301,18 @@ export const RoomView = () => {
          return f;
       }));
 
+      const userName = user?.name || user?.username || 'Someone';
+      api.createActivity(room.project.id, {
+        type: 'FILE_RENAMED',
+        description: `${userName} renamed ${oldPath.split('/').pop()} to ${newName}`,
+        metadata: { oldPath, newPath }
+      }).then(activity => {
+        const socket = socketService.getSocket();
+        if (socket && activity) {
+          socket.emit('project:activity:new', { projectId: room.project.id, activity });
+        }
+      }).catch(console.error);
+
       if (!isProjectMode) {
         socketService.notifyFilesChanged(room.id);
       }
@@ -178,11 +342,75 @@ export const RoomView = () => {
         setActiveFileId(newOpenFiles.length > 0 ? newOpenFiles[newOpenFiles.length - 1].id : null);
       }
 
+      const userName = user?.name || user?.username || 'Someone';
+      const isFolder = node.type === 'folder';
+      api.createActivity(room.project.id, {
+        type: isFolder ? 'FOLDER_DELETED' : 'FILE_DELETED',
+        description: `${userName} deleted ${isFolder ? 'folder ' + node.name : node.name}`,
+        metadata: { path: node.path }
+      }).then(activity => {
+        const socket = socketService.getSocket();
+        if (socket && activity) {
+          socket.emit('project:activity:new', { projectId: room.project.id, activity });
+        }
+      }).catch(console.error);
+
       if (!isProjectMode) {
         socketService.notifyFilesChanged(room.id);
       }
     } catch (err) {
       alert(err.message);
+    }
+  };
+
+  const handleMoveFile = async (oldPath, newPath, sourceName, targetFolderName) => {
+    if (!room?.project?.id) return;
+    try {
+      await api.renameFileOrFolder(room.project.id, oldPath, newPath);
+
+      setRoom(prev => {
+        const updatedFiles = prev.project.files.map(f => {
+          if (f.path.startsWith(oldPath)) {
+            return {
+              ...f,
+              path: newPath + f.path.slice(oldPath.length),
+              name: f.path === oldPath ? newPath.split('/').pop() : f.name
+            };
+          }
+          return f;
+        });
+        return { ...prev, project: { ...prev.project, files: updatedFiles } };
+      });
+
+      setOpenFiles(prev => prev.map(f => {
+        if (f.path.startsWith(oldPath)) {
+          return {
+            ...f,
+            path: newPath + f.path.slice(oldPath.length),
+            name: f.path === oldPath ? newPath.split('/').pop() : f.name
+          };
+        }
+        return f;
+      }));
+
+      const userName = user?.name || user?.username || 'Someone';
+      api.createActivity(room.project.id, {
+        type: 'FILE_RENAMED',
+        description: `${userName} moved ${sourceName} into ${targetFolderName}`,
+        metadata: { oldPath, newPath }
+      }).then(activity => {
+        const socket = socketService.getSocket();
+        if (socket && activity) {
+          socket.emit('project:activity:new', { projectId: room.project.id, activity });
+        }
+      }).catch(console.error);
+
+      if (!isProjectMode) {
+        socketService.notifyFilesChanged(room.id);
+      }
+    } catch (err) {
+      console.error('Failed to move file:', err);
+      alert(err.message || 'Failed to move file');
     }
   };
 
@@ -237,12 +465,25 @@ export const RoomView = () => {
         }
 
         setRoom(fetchedRoom);
+        if (user?.id) {
+          setActiveUsers(prev => [...new Set([...prev, user.id])]);
+        }
         socket = socketService.connect(token);
         
-        if (socket.connected) socketService.joinRoom(id);
-        else socket.on('connect', () => socketService.joinRoom(id));
+        const handleJoin = () => socketService.joinRoom(id);
+        if (socket.connected) handleJoin();
+        socket.on('connect', handleJoin);
+        socket.on('reconnect', handleJoin);
 
-        socket.on('room:active_users', ({ activeUsers }) => setActiveUsers(activeUsers));
+        socket.on('room:active_users', ({ activeUsers }) => {
+          setActiveUsers(prev => {
+            const list = activeUsers || [];
+            if (user?.id && !list.includes(user.id)) {
+              return [...list, user.id];
+            }
+            return list;
+          });
+        });
         socket.on('room:user_joined', async ({ userId }) => {
           setActiveUsers(prev => [...new Set([...prev, userId])]);
           try {
@@ -288,7 +529,7 @@ export const RoomView = () => {
         socket.off('project:files_changed');
       }
     };
-  }, [id, navigate, token, isProjectMode]);
+  }, [id, navigate, token, isProjectMode, user?.id]);
 
   if (loading || !room) {
     return (
@@ -302,75 +543,178 @@ export const RoomView = () => {
     <div className="flex flex-col h-screen bg-[#252526] text-white font-sans overflow-hidden select-none">
       
       {/* Top Menu Bar */}
-      <div className="flex items-center justify-between h-[40px] pl-0 pr-4 bg-[#252526] shrink-0 border-b border-white/10 relative">
-        <div className="flex items-center">
-          <div className="w-[56px] flex justify-center items-center text-[18px]">
-            🦉
+      <div className="flex items-center justify-between h-[42px] px-3 bg-[#1e1e1e] shrink-0 border-b border-white/10 select-none z-20 gap-3">
+        {/* Left Section: Logo, Menus & Room Info */}
+        <div className="flex items-center space-x-3 min-w-0 shrink-0">
+          <div className="flex items-center space-x-2 shrink-0">
+            <span className="text-lg">🦉</span>
+            <span className="font-bold text-sm text-white tracking-tight hidden sm:inline">OwlSync</span>
           </div>
-          <div className="flex items-center space-x-5 text-[15.5px] font-medium text-gray-300 ml-1">
-            <div className="hover:text-white cursor-pointer transition-colors">File</div>
-            <div className="hover:text-white cursor-pointer transition-colors">View</div>
-            <div className="hover:text-white cursor-pointer transition-colors">Terminal</div>
-          </div>
-        </div>
 
-        {/* Centered Title */}
-        <div className="absolute left-1/2 -translate-x-1/2 flex items-center">
-          <div className="text-[14px] font-bold text-white flex items-center tracking-wide">
-            {room.name || 'OwlSync Project'}
+          <div className="h-4 w-[1px] bg-white/10 shrink-0" />
+
+          {/* Menus */}
+          <div className="flex items-center space-x-3 text-xs font-medium text-gray-400 shrink-0">
+            <div className="hover:text-white cursor-pointer transition-colors px-1.5 py-1 rounded hover:bg-white/5">File</div>
+            <div className="hover:text-white cursor-pointer transition-colors px-1.5 py-1 rounded hover:bg-white/5">View</div>
+            <div 
+              className="hover:text-white cursor-pointer transition-colors px-1.5 py-1 rounded hover:bg-white/5 text-indigo-300"
+              onClick={() => setShowBottomPanel(!showBottomPanel)}
+            >
+              Terminal
+            </div>
+          </div>
+
+          <div className="h-4 w-[1px] bg-white/10 shrink-0" />
+
+          {/* Room Name & Status */}
+          <div className="flex items-center space-x-2 min-w-0 max-w-[200px] sm:max-w-[280px]">
+            <span className="text-xs font-semibold text-gray-200 truncate" title={room?.name || 'OwlSync Project'}>
+              {room?.name || 'OwlSync Project'}
+            </span>
             {!isProjectMode && (
-              <span className="ml-3 flex items-center text-xs font-normal bg-white/10 px-2 py-0.5 rounded-full text-gray-200">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-normal bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 animate-pulse" />
                 {activeUsers.length} Online
               </span>
             )}
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
+        {/* Right Section: Actions & Utilities */}
+        <div className="flex items-center space-x-2 shrink-0">
+          {/* Live WebRTC Voice Bar */}
+          {!isProjectMode && (
+            <VoiceControlBar
+              inVoice={voice.inVoice}
+              isMuted={voice.isMuted}
+              isDeafened={voice.isDeafened}
+              isSpeaking={voice.isSpeaking}
+              voiceUsers={voice.voiceUsers}
+              currentUser={user}
+              onJoinVoice={voice.joinVoice}
+              onLeaveVoice={voice.leaveVoice}
+              onToggleMute={voice.toggleMute}
+              onToggleDeafen={voice.toggleDeafen}
+            />
+          )}
+
+          {/* In-IDE Session Screen Recording Control */}
+          {!recorder.isRecording ? (
+            <button
+              onClick={recorder.startRecording}
+              className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-red-500/15 hover:bg-red-500/25 text-red-300 hover:text-white border border-red-500/30 text-xs font-medium transition-all shadow-sm active:scale-95 shrink-0"
+              title="Record IDE Screen & Audio Session"
+            >
+              <Film className="w-3.5 h-3.5 text-red-400" />
+              <span className="hidden sm:inline">Record</span>
+            </button>
+          ) : (
+            <div className="flex items-center space-x-2 px-2.5 py-1 bg-red-950/80 border border-red-500/60 rounded-md text-xs text-red-200 shrink-0 shadow-md">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+              <span className="font-mono font-bold text-red-300">REC {recorder.formattedDuration}</span>
+              <button
+                onClick={recorder.stopRecording}
+                className="p-1 bg-red-600 hover:bg-red-500 text-white rounded transition-colors ml-1"
+                title="Stop Recording"
+              >
+                <StopCircle className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          <div className="h-4 w-[1px] bg-white/10 shrink-0" />
+
+          {/* Run Code Button */}
+          <button 
+            onClick={() => {
+              const activeFile = openFiles.find(f => f.id === activeFileId);
+              if (activeFile && (activeFile.name.endsWith('.js') || activeFile.name.endsWith('.ts'))) {
+                const socket = socketService.getSocket();
+                if (socket) {
+                  setShowBottomPanel(true);
+                  socket.emit('terminal:data', { 
+                    projectId: room?.project?.id, 
+                    data: `node ${activeFile.path.slice(1)}\r` 
+                  });
+                }
+              } else {
+                alert('Please select a JavaScript or TypeScript file to run.');
+              }
+            }}
+            className="flex items-center text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 active:scale-95 px-3 py-1.5 rounded-md transition-all shadow-sm shrink-0"
+            title="Run Active File in Terminal"
+          >
+            <VscPlay className="w-3.5 h-3.5 mr-1 shrink-0" />
+            <span>Run</span>
+          </button>
+
+          <div className="h-4 w-[1px] bg-white/10 shrink-0" />
+
           {!isProjectMode ? (
             <>
+              {/* AI Pair Programmer */}
               <button 
-                onClick={() => toggleRightPanel('notes')}
-                className={`p-1.5 rounded transition-colors mr-2 ${rightPanel === 'notes' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-                title="Shared Notes"
+                onClick={() => toggleRightPanel('ai')}
+                className={`p-1.5 rounded-md transition-all shrink-0 ${rightPanel === 'ai' ? 'bg-indigo-600 text-white shadow-sm ring-1 ring-amber-400/50' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
+                title="OwlSync AI Pair Programmer"
               >
-                <VscNotebook className="w-5 h-5" />
-              </button>
-              <button 
-                onClick={() => setShowWhiteboard(prev => !prev)}
-                className={`p-1.5 rounded transition-colors mr-4 ${showWhiteboard ? 'bg-indigo-500 text-white' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-                title="Whiteboard"
-              >
-                <VscEdit className="w-5 h-5" />
+                <Sparkles className="w-4 h-4 text-amber-400" />
               </button>
 
+              {/* Whiteboard Toggle */}
+              <button 
+                onClick={() => setShowWhiteboard(prev => !prev)}
+                className={`p-1.5 rounded-md transition-all shrink-0 ${showWhiteboard ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
+                title="Whiteboard Canvas"
+              >
+                <VscEdit className="w-4 h-4" />
+              </button>
+
+              {/* Shared Notes */}
+              <button 
+                onClick={() => toggleRightPanel('notes')}
+                className={`p-1.5 rounded-md transition-all shrink-0 ${rightPanel === 'notes' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
+                title="Shared Notes"
+              >
+                <VscNotebook className="w-4 h-4" />
+              </button>
+
+              {/* Room Chat */}
               <button 
                 onClick={() => toggleRightPanel('chat')}
-                className={`p-1.5 rounded transition-colors relative ${rightPanel === 'chat' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                className={`p-1.5 rounded-md transition-all shrink-0 relative ${rightPanel === 'chat' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
                 title="Room Chat"
               >
-                <VscCommentDiscussion className="w-5 h-5" />
+                <VscCommentDiscussion className="w-4 h-4" />
                 {unreadCount > 0 && rightPanel !== 'chat' && (
-                  <div className="absolute top-0 right-0 w-[12px] h-[12px] bg-indigo-500 rounded-full flex items-center justify-center text-[8px] text-white">
+                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-indigo-500 rounded-full flex items-center justify-center text-[9px] font-bold text-white ring-2 ring-[#1e1e1e]">
                     {unreadCount > 9 ? '9+' : unreadCount}
-                  </div>
+                  </span>
                 )}
               </button>
+
+              {/* Session Timeline */}
               <button 
                 onClick={() => toggleRightPanel('timeline')}
-                className={`p-1.5 rounded transition-colors mr-2 ${rightPanel === 'timeline' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                className={`p-1.5 rounded-md transition-all shrink-0 ${rightPanel === 'timeline' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
                 title="Session Timeline"
               >
-                <VscHistory className="w-5 h-5" />
+                <VscHistory className="w-4 h-4" />
               </button>
+
+              {/* Participants */}
               <button 
                 onClick={() => toggleRightPanel('members')}
-                className={`p-1.5 rounded transition-colors ${rightPanel === 'members' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-                title="Participants"
+                className={`p-1.5 rounded-md transition-all shrink-0 ${rightPanel === 'members' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
+                title="Room Members"
               >
-                <VscOrganization className="w-5 h-5" />
+                <VscOrganization className="w-4 h-4" />
               </button>
+
+              <div className="h-4 w-[1px] bg-white/10 shrink-0" />
+
+              {/* Leave / End Button */}
               <button 
                 onClick={async () => {
                   const actionStr = room?.ownerId === user?.id ? "end this session and delete the room" : "leave this room";
@@ -388,41 +732,50 @@ export const RoomView = () => {
                     }
                   }
                 }}
-                className="flex items-center text-[13px] text-red-400 hover:text-white hover:bg-red-500 px-3 py-1 rounded transition-colors ml-2 border border-red-400/20 hover:border-red-500"
+                className="flex items-center text-xs text-red-400 hover:text-white hover:bg-red-600 px-2.5 py-1 rounded-md transition-all border border-red-500/20 hover:border-red-600 shrink-0"
+                title={room?.ownerId === user?.id ? "End Session" : "Leave Room"}
               >
-                <VscSignOut className="w-4 h-4 mr-1.5" />
-                {room?.ownerId === user?.id ? "End Session" : "Leave"}
+                <VscSignOut className="w-3.5 h-3.5 mr-1 shrink-0" />
+                <span>{room?.ownerId === user?.id ? "End" : "Leave"}</span>
               </button>
             </>
           ) : (
             <>
+              {/* AI Pair Programmer */}
               <button 
-                onClick={() => toggleRightPanel('notes')}
-                className={`p-1.5 rounded transition-colors mr-2 ${rightPanel === 'notes' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-                title="Shared Notes"
+                onClick={() => toggleRightPanel('ai')}
+                className={`p-1.5 rounded-md transition-all shrink-0 ${rightPanel === 'ai' ? 'bg-indigo-600 text-white shadow-sm ring-1 ring-amber-400/50' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
+                title="OwlSync AI Pair Programmer"
               >
-                <VscNotebook className="w-5 h-5" />
-              </button>
-              <button 
-                onClick={() => toggleRightPanel('timeline')}
-                className={`p-1.5 rounded transition-colors mr-2 ${rightPanel === 'timeline' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-                title="Project Timeline"
-              >
-                <VscHistory className="w-5 h-5" />
+                <Sparkles className="w-4 h-4 text-amber-400" />
               </button>
               <button 
                 onClick={() => setShowWhiteboard(prev => !prev)}
-                className={`p-1.5 rounded transition-colors mr-4 ${showWhiteboard ? 'bg-indigo-500 text-white' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-                title="Whiteboard"
+                className={`p-1.5 rounded-md transition-all shrink-0 ${showWhiteboard ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
+                title="Whiteboard Canvas"
               >
-                <VscEdit className="w-5 h-5" />
+                <VscEdit className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={() => toggleRightPanel('notes')}
+                className={`p-1.5 rounded-md transition-all shrink-0 ${rightPanel === 'notes' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
+                title="Project Notes"
+              >
+                <VscNotebook className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={() => toggleRightPanel('timeline')}
+                className={`p-1.5 rounded-md transition-all shrink-0 ${rightPanel === 'timeline' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
+                title="Project Timeline"
+              >
+                <VscHistory className="w-4 h-4" />
               </button>
               <button 
                 onClick={() => navigate('/projects')}
-                className="flex items-center text-[13px] text-gray-300 hover:text-white hover:bg-white/10 px-3 py-1 rounded transition-colors border border-white/10"
+                className="flex items-center text-xs text-gray-300 hover:text-white hover:bg-white/10 px-2.5 py-1 rounded-md transition-colors border border-white/10 shrink-0"
               >
-                <VscSignOut className="w-4 h-4 mr-1.5" />
-                Close Project
+                <VscSignOut className="w-3.5 h-3.5 mr-1 shrink-0" />
+                <span>Close</span>
               </button>
             </>
           )}
@@ -430,8 +783,20 @@ export const RoomView = () => {
       </div>
 
       {showWhiteboard ? (
-        <div className="flex-1 flex w-full relative z-10 bg-[#252526]">
-          <WhiteboardPanel projectId={isProjectMode ? id : room?.project?.id} isProjectMode={isProjectMode} />
+        <div className="flex-1 w-full h-full relative z-10 bg-[#252526] overflow-hidden flex flex-col">
+          <div className="h-9 px-4 bg-[#1e1e1e] border-b border-white/10 flex items-center justify-between shrink-0">
+            <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Whiteboard Canvas</span>
+            <button 
+              onClick={() => setShowWhiteboard(false)}
+              className="text-xs px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded transition-colors flex items-center gap-1 font-medium shadow-sm"
+            >
+              <VscClose className="w-3.5 h-3.5" />
+              <span>Back to Editor</span>
+            </button>
+          </div>
+          <div className="flex-1 relative overflow-hidden">
+            <WhiteboardPanel projectId={isProjectMode ? id : room?.project?.id} isProjectMode={isProjectMode} />
+          </div>
         </div>
       ) : (
         <div className="flex flex-1 min-h-0">
@@ -448,17 +813,18 @@ export const RoomView = () => {
             <button 
               onClick={() => toggleActivityBarTab('search')}
               className={`p-2 relative transition-colors ${activityBarTab === 'search' ? 'text-indigo-400' : 'text-gray-400 hover:text-white'}`}
+              title="Search"
             >
               {activityBarTab === 'search' && <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-indigo-500"></div>}
               <VscSearch className="w-7 h-7" />
             </button>
             <button 
-              onClick={() => toggleActivityBarTab('terminal')}
-              className={`p-2 relative transition-colors ${activityBarTab === 'terminal' ? 'text-indigo-400' : 'text-gray-400 hover:text-white'}`}
-              title="Terminal / Environments"
+              onClick={() => toggleActivityBarTab('git')}
+              className={`p-2 relative transition-colors ${activityBarTab === 'git' ? 'text-indigo-400' : 'text-gray-400 hover:text-white'}`}
+              title="Source Control (Git)"
             >
-              {activityBarTab === 'terminal' && <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-indigo-500"></div>}
-              <VscTerminal className="w-7 h-7" />
+              {activityBarTab === 'git' && <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-indigo-500"></div>}
+              <VscSourceControl className="w-7 h-7" />
             </button>
           </div>
           <div className="flex flex-col space-y-4 w-full items-center relative">
@@ -547,6 +913,7 @@ export const RoomView = () => {
                 onCreateFile={handleCreateFile}
                 onRenameFile={handleRenameFile}
                 onDeleteFile={handleDeleteFile}
+                onMoveFile={handleMoveFile}
               />
             )}
 
@@ -557,14 +924,47 @@ export const RoomView = () => {
               />
             )}
 
-            {activityBarTab === 'terminal' && (
-              <div className="flex flex-col h-full w-full p-6 items-center justify-center text-center">
-                <VscTerminal className="w-12 h-12 text-gray-600 mb-4" />
-                <h3 className="text-gray-300 font-medium text-[15px] mb-2">Execution Environment</h3>
-                <p className="text-gray-500 text-[13px] leading-relaxed">
-                  Terminal and code execution environments are coming in Phase 4.
-                </p>
-              </div>
+            {activityBarTab === 'git' && (
+              <SourceControlPanel 
+                projectId={isProjectMode ? id : room.project.id}
+                projectFiles={room.project.files || openFiles}
+                openFiles={openFiles}
+                currentUser={user}
+                onFileSelect={handleFileSelect}
+                onOpenDiff={(change) => {
+                  setPendingDiff({
+                    fileId: change.file?.id,
+                    filePath: change.path,
+                    originalContent: change.originalContent,
+                    newContent: change.newContent
+                  });
+                  const targetFile = openFiles.find(f => f.path === change.path || f.id === change.file?.id);
+                  if (targetFile && targetFile.id !== activeFileId) {
+                    setActiveFileId(targetFile.id);
+                  }
+                }}
+                onRevertFile={async (file, originalContent) => {
+                  const targetProjId = isProjectMode ? id : room?.project?.id;
+                  if (!targetProjId || !file?.id) return;
+                  try {
+                    await api.updateFile(targetProjId, file.id, originalContent);
+                    setOpenFiles(prev => prev.map(f => f.id === file.id ? { ...f, content: originalContent } : f));
+                    setRoom(prev => ({
+                      ...prev,
+                      project: {
+                        ...prev.project,
+                        files: prev.project.files.map(f => f.id === file.id ? { ...f, content: originalContent } : f)
+                      }
+                    }));
+                    if (!isProjectMode) {
+                      socketService.notifyFilesChanged(room.id);
+                    }
+                  } catch (err) {
+                    console.error('Failed to revert file:', err);
+                  }
+                }}
+                isProjectMode={isProjectMode}
+              />
             )}
           </div>
         )}
@@ -572,7 +972,7 @@ export const RoomView = () => {
         {/* Editor Area */}
         <div className="flex-1 flex flex-col min-w-0 bg-[#252526] relative">
           {openFiles.length > 0 ? (
-            <>
+            <div className="flex-1 flex flex-col min-h-0 relative">
               <EditorTabs 
                 openFiles={openFiles} 
                 activeFileId={activeFileId}
@@ -585,11 +985,21 @@ export const RoomView = () => {
                   roomId={isProjectMode ? null : room.id} 
                   projectId={isProjectMode ? id : room.project.id}
                   activeFile={openFiles.find(f => f.id === activeFileId)}
+                  onSelectionChange={(text) => setSelectedCode(text)}
+                  pendingDiff={pendingDiff}
+                  onAcceptDiff={handleAcceptDiff}
+                  onRejectDiff={handleRejectDiff}
+                  aiEditHistory={aiEditHistory}
+                  onRollback={handleRollback}
+                  onOpenAI={(text) => {
+                    setSelectedCode(text);
+                    setRightPanel('ai');
+                  }}
                 />
               </div>
-            </>
+            </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-gray-400 select-none bg-[#1e1e1e]">
+            <div className="flex-1 flex flex-col items-center justify-center h-full text-gray-400 select-none bg-[#1e1e1e]">
               <VscFiles className="w-32 h-32 text-gray-600 mb-8" />
               <div className="text-2xl mb-5 font-light text-white">OwlSync IDE</div>
               <div className="flex items-center space-x-3 text-[15px]">
@@ -602,38 +1012,37 @@ export const RoomView = () => {
               </div>
             </div>
           )}
+          
+          {/* Bottom Panel */}
+          {showBottomPanel && (
+            <div 
+              className="border-t border-white/10 flex flex-col bg-[#1e1e1e] shrink-0 relative"
+              style={{ height: `${bottomPanelHeight}px` }}
+            >
+              <div 
+                className="absolute top-0 left-0 right-0 h-[4px] -mt-[2px] cursor-row-resize hover:bg-indigo-500 z-20 group"
+                onMouseDown={handleBottomPanelResizeMouseDown}
+              >
+                <div className="w-full h-full opacity-0 group-hover:opacity-100 bg-indigo-500 transition-opacity" />
+              </div>
+              <TerminalPanel 
+                roomId={isProjectMode ? null : room.id}
+                projectId={isProjectMode ? id : room.project?.id}
+                onClose={() => setShowBottomPanel(false)}
+              />
+            </div>
+          )}
         </div>
 
         {/* Right Sidebar Panels */}
         {!isProjectMode && rightPanel === 'members' && (
-          <div className="flex flex-col h-full bg-[#252526] w-72 shrink-0 overflow-hidden border-l border-white/10">
-            <div className="px-4 py-2 text-[13px] font-bold text-white tracking-wider uppercase h-[44px] flex items-center border-b border-white/10">
-              Participants
-            </div>
-            <div className="flex-1 overflow-y-auto p-2 scrollbar-thin">
-              <div className="px-2 py-1 text-xs font-semibold text-gray-400 mb-2">ONLINE ({activeUsers.length})</div>
-              {room.members.map((member) => {
-                const isOnline = activeUsers.includes(member.user.id);
-                if (!isOnline) return null;
-                return (
-                  <div key={member.id} className="flex items-center space-x-3 p-2 hover:bg-white/10 cursor-default rounded bg-white/5 mb-2">
-                    <div className="relative">
-                      <AvatarDisplay avatarUrl={member.user.avatarUrl} name={member.user.name || member.user.username} size={28} />
-                      <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-[#252526]"></div>
-                    </div>
-                    <div className="text-[14px] text-white truncate flex-1">
-                      {member.user.name || member.user.username}
-                      {member.user.id === user?.id ? (
-                        <span className="ml-1 text-gray-400 text-xs font-normal">(You)</span>
-                      ) : (
-                        <span className="ml-1 text-gray-400 text-xs font-normal uppercase">{member.role}</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <MembersPanel
+            activeUsers={activeUsers}
+            currentUser={user}
+            roomOwnerId={room?.ownerId}
+            voice={voice}
+            onClose={() => setRightPanel('none')}
+          />
         )}
 
         {!isProjectMode && rightPanel === 'chat' && (
@@ -649,9 +1058,81 @@ export const RoomView = () => {
 
         <div 
           className={`flex flex-col h-full bg-[#252526] shrink-0 overflow-hidden transition-all duration-300 ease-in-out ${
-            (rightPanel === 'notes' || rightPanel === 'timeline') ? 'w-80 border-l border-white/10 opacity-100' : 'w-0 border-none opacity-0'
+            (rightPanel === 'notes' || rightPanel === 'timeline' || rightPanel === 'ai') ? 'w-80 sm:w-96 border-l border-white/10 opacity-100' : 'w-0 border-none opacity-0'
           }`}
         >
+          {rightPanel === 'ai' && (
+            <AIPanel 
+              projectId={isProjectMode ? id : room?.project?.id}
+              roomName={room?.name}
+              activeFile={openFiles.find(f => f.id === activeFileId)}
+              selectedCode={selectedCode}
+              projectFiles={room?.project?.files && room.project.files.length > 0 ? room.project.files : openFiles}
+              pendingDiff={pendingDiff}
+              aiEditHistory={aiEditHistory}
+              onRollback={handleRollback}
+              onDiffProposed={(diff) => {
+                setPendingDiff(diff);
+                const targetFile = openFiles.find(f => f.id === diff.fileId || f.path === diff.filePath || (f.name && diff.filePath?.endsWith(f.name)));
+                if (targetFile && targetFile.id !== activeFileId) {
+                  setActiveFileId(targetFile.id);
+                }
+              }}
+              onAcceptDiff={handleAcceptDiff}
+              onRejectDiff={handleRejectDiff}
+              onApplyCode={async (code, targetFilePath) => {
+                const targetProjId = isProjectMode ? id : room?.project?.id;
+                const targetFile = targetFilePath 
+                  ? openFiles.find(f => f.path === targetFilePath || f.name === targetFilePath) || openFiles.find(f => f.id === activeFileId)
+                  : openFiles.find(f => f.id === activeFileId);
+                
+                if (targetFile && targetProjId) {
+                  try {
+                    // Record snapshot before applying code
+                    const snapshot = {
+                      id: 'ai-snap-' + Date.now(),
+                      fileId: targetFile.id,
+                      filePath: targetFile.path,
+                      fileName: targetFile.name,
+                      previousContent: targetFile.content,
+                      newContent: code,
+                      timestamp: new Date()
+                    };
+                    setAiEditHistory(prev => [snapshot, ...prev]);
+
+                    await api.updateFile(targetProjId, targetFile.id, code);
+                    setOpenFiles(prev => prev.map(f => f.id === targetFile.id ? { ...f, content: code } : f));
+                    if (!isProjectMode) {
+                      socketService.notifyFilesChanged(room.id);
+                    }
+                  } catch (err) {
+                    console.error('Failed to apply code to file:', err);
+                  }
+                }
+              }}
+              onFilesChanged={async () => {
+                const targetProjId = isProjectMode ? id : room?.project?.id;
+                if (!targetProjId) return;
+                try {
+                  const proj = await api.getProject(targetProjId);
+                  if (proj?.files) {
+                    setRoom(prev => ({
+                      ...prev,
+                      project: { ...prev.project, files: proj.files }
+                    }));
+                    setOpenFiles(prev => {
+                      return prev.map(of => {
+                        const fresh = proj.files.find(f => f.id === of.id || f.path === of.path);
+                        return fresh ? { ...of, ...fresh } : of;
+                      });
+                    });
+                  }
+                } catch (e) {
+                  console.error('Failed to refresh files after agent action:', e);
+                }
+              }}
+            />
+          )}
           {(isProjectMode ? id : room?.project?.id) && rightPanel === 'notes' && (
             <NotesPanel projectId={isProjectMode ? id : room.project.id} isProjectMode={isProjectMode} />
           )}
@@ -692,6 +1173,15 @@ export const RoomView = () => {
         </div>
       </div>
       
+      {/* Session Video Recording Modal Preview & Export */}
+      <RecordingModal
+        isOpen={recorder.showPreviewModal}
+        onClose={() => recorder.setShowPreviewModal(false)}
+        blobUrl={recorder.recordedBlobUrl}
+        blob={recorder.recordedBlob}
+        formattedDuration={recorder.formattedDuration}
+        onDownload={recorder.downloadRecording}
+      />
     </div>
   );
 };

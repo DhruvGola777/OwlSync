@@ -7,7 +7,7 @@ class SocketService {
     this.socket = null;
   }
 
-  connect(token) {
+  connect() {
     if (this.socket) {
       return this.socket;
     }

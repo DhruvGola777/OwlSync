@@ -1,5 +1,5 @@
 import React from 'react';
-import Avatar, { genConfig } from 'react-nice-avatar';
+import Avatar from 'react-nice-avatar';
 
 export default function AvatarDisplay({ avatarUrl, name, size = 40, style = {} }) {
   // If no avatarUrl is provided, generate an initials avatar using ui-avatars.com
@@ -22,7 +22,7 @@ export default function AvatarDisplay({ avatarUrl, name, size = 40, style = {} }
   let avatarConfig = null;
   try {
     avatarConfig = JSON.parse(avatarUrl);
-  } catch (e) {
+  } catch {
     // If it's not JSON, it's likely a regular image URL
     avatarConfig = null;
   }

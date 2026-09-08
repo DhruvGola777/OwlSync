@@ -1,7 +1,6 @@
 import React from 'react';
-import { X } from 'lucide-react';
 import { VscClose } from 'react-icons/vsc';
-import { getFileIcon } from './FileExplorer';
+import { getFileIcon } from '../utils/fileIcons';
 
 export const EditorTabs = ({ openFiles, activeFileId, onTabSelect, onTabClose }) => {
   return (

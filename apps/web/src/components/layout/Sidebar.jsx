@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, FolderOpen, Settings as SettingsIcon, LogOut, Code2, Home, Globe } from 'lucide-react';
+import { Users, FolderOpen, Settings as SettingsIcon, LogOut, Code2, Globe } from 'lucide-react';
 import { useAuth } from '../../providers/AuthProvider';
 
 const navItems = [

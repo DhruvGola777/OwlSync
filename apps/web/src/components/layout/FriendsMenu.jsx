@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, UserPlus, Check, X, Search, Loader2 } from 'lucide-react';
+import { Users, UserPlus, Check, X, Loader2 } from 'lucide-react';
 import { api } from '../../services/api';
 import AvatarDisplay from '../ui/AvatarDisplay';
 import { formatDistanceToNow } from 'date-fns';
@@ -10,12 +10,9 @@ export const FriendsMenu = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [friends, setFriends] = useState([]);
   const [incomingReqs, setIncomingReqs] = useState([]);
-  const [outgoingReqs, setOutgoingReqs] = useState([]);
   const [loading, setLoading] = useState(false);
   
   const [searchUsername, setSearchUsername] = useState('');
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchMessage, setSearchMessage] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
@@ -54,7 +51,6 @@ export const FriendsMenu = () => {
       ]);
       setFriends(friendsData.friends || []);
       setIncomingReqs(requestsData.incoming || []);
-      setOutgoingReqs(requestsData.outgoing || []);
     } catch (err) {
       console.error('Failed to load friends data', err);
     } finally {
@@ -166,11 +162,6 @@ export const FriendsMenu = () => {
                   )}
                 </div>
               </form>
-              {searchMessage && (
-                <p className={`mt-2 text-xs ${searchMessage.includes('sent') ? 'text-green-600' : 'text-red-500'}`}>
-                  {searchMessage}
-                </p>
-              )}
             </div>
 
             <div className="max-h-96 overflow-y-auto p-4 space-y-6">

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, Search, User, Menu } from 'lucide-react';
+import { Bell, Search, Menu } from 'lucide-react';
 import { useAuth } from '../../providers/AuthProvider';
 import AvatarDisplay from '../ui/AvatarDisplay';
 import { FriendsMenu } from './FriendsMenu';

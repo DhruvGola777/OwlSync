@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { VscSearch, VscFile, VscChevronDown, VscChevronRight } from 'react-icons/vsc';
+import { VscSearch, VscFile } from 'react-icons/vsc';
 
 export const SearchPanel = ({ files, onFileSelect }) => {
   const [query, setQuery] = useState('');

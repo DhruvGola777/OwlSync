@@ -10,13 +10,54 @@ export const createRoom = async ({ name, description, password, ownerId, project
     hashedPassword = await bcryptjs.hash(password, 10);
   }
 
+  let finalProjectId = projectId;
+  if (!finalProjectId) {
+    const project = await prisma.project.create({
+      data: {
+        name: `${name} Project`,
+        description: description || `Project environment for ${name}`,
+        ownerId,
+        files: {
+          create: [
+            {
+              name: 'index.js',
+              path: '/index.js',
+              content: `// Welcome to ${name} on OwlSync!\nconsole.log("Hello from OwlSync Room!");\n`
+            },
+            {
+              name: 'package.json',
+              path: '/package.json',
+              content: `{\n  "name": "${name.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'owlsync-app'}",\n  "version": "1.0.0",\n  "main": "index.js",\n  "scripts": {\n    "start": "node index.js"\n  }\n}\n`
+            },
+            {
+              name: 'README.md',
+              path: '/README.md',
+              content: `# ${name}\n\nCollaborative room project created on OwlSync.\n`
+            }
+          ]
+        },
+        whiteboard: {
+          create: {
+            state: ''
+          }
+        },
+        note: {
+          create: {
+            content: `# Meeting Notes for ${name}\n\n- Discuss architecture\n- Pair program features\n`
+          }
+        }
+      }
+    });
+    finalProjectId = project.id;
+  }
+
   return prisma.room.create({
     data: {
       name,
       description,
       password: hashedPassword,
       ownerId,
-      projectId,
+      projectId: finalProjectId,
       members: {
         create: {
           userId: ownerId,
@@ -30,6 +71,9 @@ export const createRoom = async ({ name, description, password, ownerId, project
       },
       _count: {
         select: { members: true }
+      },
+      project: {
+        include: { files: true }
       }
     }
   });
@@ -59,7 +103,7 @@ export const getRooms = async () => {
 };
 
 export const getRoomById = async (roomId) => {
-  const room = await prisma.room.findUnique({
+  let room = await prisma.room.findUnique({
     where: { id: roomId },
     include: {
       owner: { select: { id: true, username: true, name: true, avatarUrl: true } },
@@ -73,6 +117,55 @@ export const getRoomById = async (roomId) => {
       }
     }
   });
+
+  if (room && (!room.projectId || !room.project)) {
+    // Auto-heal existing room that lacks a project
+    const project = await prisma.project.create({
+      data: {
+        name: `${room.name} Project`,
+        description: room.description || `Project environment for ${room.name}`,
+        ownerId: room.ownerId,
+        files: {
+          create: [
+            {
+              name: 'index.js',
+              path: '/index.js',
+              content: `// Welcome to ${room.name} on OwlSync!\nconsole.log("Hello from OwlSync Room!");\n`
+            },
+            {
+              name: 'package.json',
+              path: '/package.json',
+              content: `{\n  "name": "${room.name.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'owlsync-app'}",\n  "version": "1.0.0",\n  "main": "index.js",\n  "scripts": {\n    "start": "node index.js"\n  }\n}\n`
+            },
+            {
+              name: 'README.md',
+              path: '/README.md',
+              content: `# ${room.name}\n\nCollaborative room project created on OwlSync.\n`
+            }
+          ]
+        },
+        whiteboard: {
+          create: {
+            state: ''
+          }
+        },
+        note: {
+          create: {
+            content: `# Meeting Notes for ${room.name}\n\n- Discuss architecture\n- Pair program features\n`
+          }
+        }
+      },
+      include: { files: true }
+    });
+
+    await prisma.room.update({
+      where: { id: roomId },
+      data: { projectId: project.id }
+    });
+
+    room.projectId = project.id;
+    room.project = project;
+  }
 
   if (room) {
     room.isProtected = !!room.password;
