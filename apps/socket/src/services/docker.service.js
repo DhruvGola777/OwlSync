@@ -147,7 +147,7 @@ export const dockerService = {
     activeWatchers.add(projectId);
 
     try {
-      await this.writeToContainerFile(container, '/workspace/.owl-watcher.js', watcherScript);
+      await this.writeToContainerFile(container, '.owl-watcher.js', watcherScript);
       const exec = await container.exec({
         Cmd: ['node', '/workspace/.owl-watcher.js'],
         AttachStdout: true,
@@ -182,8 +182,8 @@ export const dockerService = {
 
   _resolveWorkspacePath(filePath) {
     if (!filePath) return '/workspace';
-    if (filePath.startsWith('/workspace')) return filePath;
-    return `/workspace${filePath.startsWith('/') ? '' : '/'}${filePath}`;
+    const cleanPath = filePath.replace(/^\/+/, '');
+    return path.posix.join('/workspace', cleanPath);
   },
 
   async readFileFromContainer(container, filePath) {
@@ -350,6 +350,9 @@ export const dockerService = {
     try {
       const container = await this.getOrCreateContainer(projectId);
       
+      // Ensure all project files from DB are synced to container
+      await this.syncFilesToContainer(projectId, container);
+
       const exec = await container.exec({
         Cmd: ['/bin/sh'],
         AttachStdin: true,

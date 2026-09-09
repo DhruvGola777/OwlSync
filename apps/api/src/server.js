@@ -8,9 +8,15 @@ import roomRoutes from './modules/rooms/rooms.routes.js';
 import friendsRoutes from './modules/friends/friends.routes.js';
 import projectsRoutes from './modules/projects/projects.routes.js';
 import aiRoutes from './modules/ai/ai.routes.js';
+import recordingsRoutes from './modules/recordings/recordings.routes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import AppError from './utils/AppError.js';
 import { connectRabbitMQ, publishToQueue } from './config/rabbitmq.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = env.PORT;
@@ -23,6 +29,9 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
+// Serve static recordings uploads
+app.use('/uploads/recordings', express.static(path.resolve(__dirname, '../storage/recordings')));
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
@@ -30,6 +39,7 @@ app.use('/api/rooms', roomRoutes);
 app.use('/api/friends', friendsRoutes);
 app.use('/api/projects', projectsRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/recordings', recordingsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

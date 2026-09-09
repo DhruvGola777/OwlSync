@@ -8,6 +8,7 @@ import { ResetPassword } from '../features/auth/pages/ResetPassword';
 import { MagicLink } from '../features/auth/pages/MagicLink';
 import { ProjectsPage } from '../features/dashboard/pages/ProjectsPage';
 import { RoomsPage } from '../features/dashboard/pages/RoomsPage';
+import { RecordingsPage } from '../features/recordings/pages/RecordingsPage';
 import { RoomView } from '../features/rooms/pages/RoomView';
 import { ProtectedRoute } from './ProtectedRoute';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
@@ -35,6 +36,7 @@ export const AppRouter = () => {
           <Route path="/workspaces" element={<Navigate to="/projects" replace />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/rooms" element={<RoomsPage />} />
+          <Route path="/recordings" element={<RecordingsPage />} />
           <Route path="/tasks" element={<div className="p-8"><h1 className="text-2xl font-bold text-slate-800">Tasks</h1><p className="mt-2 text-slate-600">Coming soon...</p></div>} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/profile/:username" element={<PublicProfile />} />

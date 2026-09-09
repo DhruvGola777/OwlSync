@@ -7,10 +7,10 @@ import { useAuth } from '../../../providers/AuthProvider';
 import * as awarenessProtocol from 'y-protocols/awareness';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { VscEdit, VscPreview } from 'react-icons/vsc';
+import { VscEdit, VscPreview, VscClose } from 'react-icons/vsc';
 import { api } from '../../../services/api';
 
-export const NotesPanel = ({ projectId, isProjectMode }) => {
+export const NotesPanel = ({ projectId, isProjectMode, onClose }) => {
   const { user } = useAuth();
   const editorRef = useRef(null);
   const monacoRef = useRef(null);
@@ -181,21 +181,32 @@ export const NotesPanel = ({ projectId, isProjectMode }) => {
     <div className="flex flex-col h-full bg-[#252526] w-full shrink-0 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 shrink-0">
         <h3 className="font-semibold text-gray-200">Shared Notes</h3>
-        <div className="flex bg-white/5 rounded p-0.5">
-          <button 
-            onClick={() => setMode('edit')}
-            className={`p-1.5 rounded transition-colors flex items-center justify-center ${mode === 'edit' ? 'bg-indigo-500 text-white' : 'text-gray-400 hover:text-gray-200'}`}
-            title="Edit Mode"
-          >
-            <VscEdit className="w-4 h-4" />
-          </button>
-          <button 
-            onClick={() => setMode('preview')}
-            className={`p-1.5 rounded transition-colors flex items-center justify-center ${mode === 'preview' ? 'bg-indigo-500 text-white' : 'text-gray-400 hover:text-gray-200'}`}
-            title="Preview Mode"
-          >
-            <VscPreview className="w-4 h-4" />
-          </button>
+        <div className="flex items-center space-x-2">
+          <div className="flex bg-white/5 rounded p-0.5">
+            <button 
+              onClick={() => setMode('edit')}
+              className={`p-1.5 rounded transition-colors flex items-center justify-center ${mode === 'edit' ? 'bg-indigo-500 text-white' : 'text-gray-400 hover:text-gray-200'}`}
+              title="Edit Mode"
+            >
+              <VscEdit className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => setMode('preview')}
+              className={`p-1.5 rounded transition-colors flex items-center justify-center ${mode === 'preview' ? 'bg-indigo-500 text-white' : 'text-gray-400 hover:text-gray-200'}`}
+              title="Preview Mode"
+            >
+              <VscPreview className="w-4 h-4" />
+            </button>
+          </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
+              title="Close Notes"
+            >
+              <VscClose className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
       

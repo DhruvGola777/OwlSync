@@ -31,6 +31,7 @@ model User {
   blocksReceived     Block[]         @relation("BlocksReceived")
   messages           Message[]
   activities         Activity[]
+  recordings         Recording[]
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 }
@@ -210,3 +211,21 @@ model File {
 
   @@unique([projectId, path])
 }
+
+model Recording {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  filePath    String
+  url         String
+  duration    Int      @default(0) // Duration in seconds
+  size        Int?     // Size in bytes
+  mimeType    String   @default("video/webm")
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roomId      String?
+  projectId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+

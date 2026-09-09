@@ -543,8 +543,8 @@ export const RoomView = () => {
     <div className="flex flex-col h-screen bg-[#252526] text-white font-sans overflow-hidden select-none">
       
       {/* Top Menu Bar */}
-      <div className="flex items-center justify-between h-[42px] px-3 bg-[#1e1e1e] shrink-0 border-b border-white/10 select-none z-20 gap-3">
-        {/* Left Section: Logo, Menus & Room Info */}
+      <div className="flex items-center justify-between h-[42px] px-3 bg-[#1e1e1e] shrink-0 border-b border-white/10 select-none z-20 gap-3 relative">
+        {/* Left Section: Logo & Menus */}
         <div className="flex items-center space-x-3 min-w-0 shrink-0">
           <div className="flex items-center space-x-2 shrink-0">
             <span className="text-lg">🦉</span>
@@ -564,41 +564,23 @@ export const RoomView = () => {
               Terminal
             </div>
           </div>
+        </div>
 
-          <div className="h-4 w-[1px] bg-white/10 shrink-0" />
-
-          {/* Room Name & Status */}
-          <div className="flex items-center space-x-2 min-w-0 max-w-[200px] sm:max-w-[280px]">
-            <span className="text-xs font-semibold text-gray-200 truncate" title={room?.name || 'OwlSync Project'}>
-              {room?.name || 'OwlSync Project'}
+        {/* Center Section: Room Title & Online Status */}
+        <div className="absolute left-1/2 -translate-x-1/2 flex items-center space-x-2 max-w-[280px] sm:max-w-[420px] pointer-events-auto">
+          <span className="text-xs font-semibold text-gray-200 truncate" title={room?.name || 'OwlSync Project'}>
+            {room?.name || 'OwlSync Project'}
+          </span>
+          {!isProjectMode && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-normal bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 animate-pulse" />
+              {activeUsers.length} Online
             </span>
-            {!isProjectMode && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-normal bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 animate-pulse" />
-                {activeUsers.length} Online
-              </span>
-            )}
-          </div>
+          )}
         </div>
 
         {/* Right Section: Actions & Utilities */}
         <div className="flex items-center space-x-2 shrink-0">
-          {/* Live WebRTC Voice Bar */}
-          {!isProjectMode && (
-            <VoiceControlBar
-              inVoice={voice.inVoice}
-              isMuted={voice.isMuted}
-              isDeafened={voice.isDeafened}
-              isSpeaking={voice.isSpeaking}
-              voiceUsers={voice.voiceUsers}
-              currentUser={user}
-              onJoinVoice={voice.joinVoice}
-              onLeaveVoice={voice.leaveVoice}
-              onToggleMute={voice.toggleMute}
-              onToggleDeafen={voice.toggleDeafen}
-            />
-          )}
-
           {/* In-IDE Session Screen Recording Control */}
           {!recorder.isRecording ? (
             <button
@@ -629,17 +611,31 @@ export const RoomView = () => {
           <button 
             onClick={() => {
               const activeFile = openFiles.find(f => f.id === activeFileId);
-              if (activeFile && (activeFile.name.endsWith('.js') || activeFile.name.endsWith('.ts'))) {
+              if (!activeFile) {
+                alert('Please select a file to run.');
+                return;
+              }
+
+              const isJsTs = activeFile.name.endsWith('.js') || activeFile.name.endsWith('.ts') || activeFile.name.endsWith('.mjs') || activeFile.name.endsWith('.cjs');
+              const isPy = activeFile.name.endsWith('.py');
+              const isSh = activeFile.name.endsWith('.sh');
+
+              if (isJsTs || isPy || isSh) {
                 const socket = socketService.getSocket();
                 if (socket) {
                   setShowBottomPanel(true);
+                  const relPath = activeFile.path.startsWith('/') ? activeFile.path.slice(1) : activeFile.path;
+                  let cmd = `node "${relPath}"`;
+                  if (isPy) cmd = `python3 "${relPath}"`;
+                  else if (isSh) cmd = `sh "${relPath}"`;
+
                   socket.emit('terminal:data', { 
                     projectId: room?.project?.id, 
-                    data: `node ${activeFile.path.slice(1)}\r` 
+                    data: `${cmd}\r` 
                   });
                 }
               } else {
-                alert('Please select a JavaScript or TypeScript file to run.');
+                alert('Please select a JavaScript, TypeScript, Python, or Shell file to run.');
               }
             }}
             className="flex items-center text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 active:scale-95 px-3 py-1.5 rounded-md transition-all shadow-sm shrink-0"
@@ -1028,6 +1024,7 @@ export const RoomView = () => {
               <TerminalPanel 
                 roomId={isProjectMode ? null : room.id}
                 projectId={isProjectMode ? id : room.project?.id}
+                isProjectMode={isProjectMode}
                 onClose={() => setShowBottomPanel(false)}
               />
             </div>
@@ -1035,111 +1032,128 @@ export const RoomView = () => {
         </div>
 
         {/* Right Sidebar Panels */}
-        {!isProjectMode && rightPanel === 'members' && (
-          <MembersPanel
-            activeUsers={activeUsers}
-            currentUser={user}
-            roomOwnerId={room?.ownerId}
-            voice={voice}
-            onClose={() => setRightPanel('none')}
-          />
-        )}
+        {rightPanel !== 'none' && (
+          <div className="flex flex-col h-full bg-[#252526] w-80 shrink-0 overflow-hidden border-l border-white/10 select-none relative">
+            {!isProjectMode && rightPanel === 'members' && (
+              <MembersPanel
+                activeUsers={activeUsers}
+                currentUser={user}
+                roomOwnerId={room?.ownerId}
+                roomMembers={room?.members}
+                voice={voice}
+                onClose={() => setRightPanel('none')}
+              />
+            )}
 
-        {!isProjectMode && rightPanel === 'chat' && (
-          <div className="flex flex-col h-full bg-[#252526] w-72 shrink-0 overflow-hidden border-l border-white/10">
-            <div className="px-4 py-2 text-[13px] font-bold text-white tracking-wider uppercase h-[44px] flex items-center border-b border-white/10">
-              Room Chat
-            </div>
-            <div className="flex-1 overflow-hidden relative">
-               <ChatPanel roomId={room.id} onClose={() => {}} hideHeader={true} />
-            </div>
+            {!isProjectMode && rightPanel === 'chat' && (
+              <div className="flex flex-col h-full bg-[#252526] w-full shrink-0 overflow-hidden">
+                <div className="px-4 py-2.5 text-[13px] font-bold text-white tracking-wider uppercase h-[44px] flex items-center justify-between border-b border-white/10 shrink-0 bg-[#1e1e1e]">
+                  <span>Room Chat</span>
+                  <button
+                    onClick={() => setRightPanel('none')}
+                    className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                    title="Close Chat"
+                  >
+                    <VscClose className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-hidden relative">
+                  <ChatPanel roomId={room.id} onClose={() => setRightPanel('none')} hideHeader={true} />
+                </div>
+              </div>
+            )}
+
+            {rightPanel === 'ai' && (
+              <AIPanel 
+                projectId={isProjectMode ? id : room?.project?.id}
+                roomName={room?.name}
+                activeFile={openFiles.find(f => f.id === activeFileId)}
+                selectedCode={selectedCode}
+                projectFiles={room?.project?.files && room.project.files.length > 0 ? room.project.files : openFiles}
+                pendingDiff={pendingDiff}
+                aiEditHistory={aiEditHistory}
+                onRollback={handleRollback}
+                onClose={() => setRightPanel('none')}
+                onDiffProposed={(diff) => {
+                  setPendingDiff(diff);
+                  const targetFile = openFiles.find(f => f.id === diff.fileId || f.path === diff.filePath || (f.name && diff.filePath?.endsWith(f.name)));
+                  if (targetFile && targetFile.id !== activeFileId) {
+                    setActiveFileId(targetFile.id);
+                  }
+                }}
+                onAcceptDiff={handleAcceptDiff}
+                onRejectDiff={handleRejectDiff}
+                onApplyCode={async (code, targetFilePath) => {
+                  const targetProjId = isProjectMode ? id : room?.project?.id;
+                  const targetFile = targetFilePath 
+                    ? openFiles.find(f => f.path === targetFilePath || f.name === targetFilePath) || openFiles.find(f => f.id === activeFileId)
+                    : openFiles.find(f => f.id === activeFileId);
+                  
+                  if (targetFile && targetProjId) {
+                    try {
+                      // Record snapshot before applying code
+                      const snapshot = {
+                        id: 'ai-snap-' + Date.now(),
+                        fileId: targetFile.id,
+                        filePath: targetFile.path,
+                        fileName: targetFile.name,
+                        previousContent: targetFile.content,
+                        newContent: code,
+                        timestamp: new Date()
+                      };
+                      setAiEditHistory(prev => [snapshot, ...prev]);
+
+                      await api.updateFile(targetProjId, targetFile.id, code);
+                      setOpenFiles(prev => prev.map(f => f.id === targetFile.id ? { ...f, content: code } : f));
+                      if (!isProjectMode) {
+                        socketService.notifyFilesChanged(room.id);
+                      }
+                    } catch (err) {
+                      console.error('Failed to apply code to file:', err);
+                    }
+                  }
+                }}
+                onFilesChanged={async () => {
+                  const targetProjId = isProjectMode ? id : room?.project?.id;
+                  if (!targetProjId) return;
+                  try {
+                    const proj = await api.getProject(targetProjId);
+                    if (proj?.files) {
+                      setRoom(prev => ({
+                        ...prev,
+                        project: { ...prev.project, files: proj.files }
+                      }));
+                      setOpenFiles(prev => {
+                        return prev.map(of => {
+                          const fresh = proj.files.find(f => f.id === of.id || f.path === of.path);
+                          return fresh ? { ...of, ...fresh } : of;
+                        });
+                      });
+                    }
+                  } catch (e) {
+                    console.error('Failed to refresh files after agent action:', e);
+                  }
+                }}
+              />
+            )}
+
+            {(isProjectMode ? id : room?.project?.id) && rightPanel === 'notes' && (
+              <NotesPanel 
+                projectId={isProjectMode ? id : room.project.id} 
+                isProjectMode={isProjectMode} 
+                onClose={() => setRightPanel('none')} 
+              />
+            )}
+
+            {(isProjectMode ? id : room?.project?.id) && rightPanel === 'timeline' && (
+              <TimelinePanel 
+                projectId={isProjectMode ? id : room.project.id} 
+                isProjectMode={isProjectMode} 
+                onClose={() => setRightPanel('none')} 
+              />
+            )}
           </div>
         )}
-
-        <div 
-          className={`flex flex-col h-full bg-[#252526] shrink-0 overflow-hidden transition-all duration-300 ease-in-out ${
-            (rightPanel === 'notes' || rightPanel === 'timeline' || rightPanel === 'ai') ? 'w-80 sm:w-96 border-l border-white/10 opacity-100' : 'w-0 border-none opacity-0'
-          }`}
-        >
-          {rightPanel === 'ai' && (
-            <AIPanel 
-              projectId={isProjectMode ? id : room?.project?.id}
-              roomName={room?.name}
-              activeFile={openFiles.find(f => f.id === activeFileId)}
-              selectedCode={selectedCode}
-              projectFiles={room?.project?.files && room.project.files.length > 0 ? room.project.files : openFiles}
-              pendingDiff={pendingDiff}
-              aiEditHistory={aiEditHistory}
-              onRollback={handleRollback}
-              onDiffProposed={(diff) => {
-                setPendingDiff(diff);
-                const targetFile = openFiles.find(f => f.id === diff.fileId || f.path === diff.filePath || (f.name && diff.filePath?.endsWith(f.name)));
-                if (targetFile && targetFile.id !== activeFileId) {
-                  setActiveFileId(targetFile.id);
-                }
-              }}
-              onAcceptDiff={handleAcceptDiff}
-              onRejectDiff={handleRejectDiff}
-              onApplyCode={async (code, targetFilePath) => {
-                const targetProjId = isProjectMode ? id : room?.project?.id;
-                const targetFile = targetFilePath 
-                  ? openFiles.find(f => f.path === targetFilePath || f.name === targetFilePath) || openFiles.find(f => f.id === activeFileId)
-                  : openFiles.find(f => f.id === activeFileId);
-                
-                if (targetFile && targetProjId) {
-                  try {
-                    // Record snapshot before applying code
-                    const snapshot = {
-                      id: 'ai-snap-' + Date.now(),
-                      fileId: targetFile.id,
-                      filePath: targetFile.path,
-                      fileName: targetFile.name,
-                      previousContent: targetFile.content,
-                      newContent: code,
-                      timestamp: new Date()
-                    };
-                    setAiEditHistory(prev => [snapshot, ...prev]);
-
-                    await api.updateFile(targetProjId, targetFile.id, code);
-                    setOpenFiles(prev => prev.map(f => f.id === targetFile.id ? { ...f, content: code } : f));
-                    if (!isProjectMode) {
-                      socketService.notifyFilesChanged(room.id);
-                    }
-                  } catch (err) {
-                    console.error('Failed to apply code to file:', err);
-                  }
-                }
-              }}
-              onFilesChanged={async () => {
-                const targetProjId = isProjectMode ? id : room?.project?.id;
-                if (!targetProjId) return;
-                try {
-                  const proj = await api.getProject(targetProjId);
-                  if (proj?.files) {
-                    setRoom(prev => ({
-                      ...prev,
-                      project: { ...prev.project, files: proj.files }
-                    }));
-                    setOpenFiles(prev => {
-                      return prev.map(of => {
-                        const fresh = proj.files.find(f => f.id === of.id || f.path === of.path);
-                        return fresh ? { ...of, ...fresh } : of;
-                      });
-                    });
-                  }
-                } catch (e) {
-                  console.error('Failed to refresh files after agent action:', e);
-                }
-              }}
-            />
-          )}
-          {(isProjectMode ? id : room?.project?.id) && rightPanel === 'notes' && (
-            <NotesPanel projectId={isProjectMode ? id : room.project.id} isProjectMode={isProjectMode} />
-          )}
-          {(isProjectMode ? id : room?.project?.id) && rightPanel === 'timeline' && (
-            <TimelinePanel projectId={isProjectMode ? id : room.project.id} isProjectMode={isProjectMode} />
-          )}
-        </div>
       </div>
       )}
       {/* Bottom Status Bar */}
@@ -1180,6 +1194,10 @@ export const RoomView = () => {
         blobUrl={recorder.recordedBlobUrl}
         blob={recorder.recordedBlob}
         formattedDuration={recorder.formattedDuration}
+        durationSeconds={recorder.recordingSeconds}
+        roomId={room?.id}
+        projectId={isProjectMode ? id : room?.project?.id}
+        roomName={room?.name}
         onDownload={recorder.downloadRecording}
       />
     </div>

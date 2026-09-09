@@ -1,11 +1,12 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Users, FolderOpen, Settings as SettingsIcon, LogOut, Code2, Globe } from 'lucide-react';
+import { Users, FolderOpen, Settings as SettingsIcon, LogOut, Code2, Globe, Film } from 'lucide-react';
 import { useAuth } from '../../providers/AuthProvider';
 
 const navItems = [
   { name: 'Projects', href: '/projects', icon: FolderOpen },
   { name: 'Rooms', href: '/rooms', icon: Globe },
+  { name: 'Recordings', href: '/recordings', icon: Film },
   { name: 'Team', href: '/team', icon: Users },
   { name: 'Settings', href: '/settings', icon: SettingsIcon },
 ];

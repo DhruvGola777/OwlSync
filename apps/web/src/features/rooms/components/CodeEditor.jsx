@@ -7,6 +7,7 @@ import { socketService } from '../../../services/socket';
 import { api } from '../../../services/api';
 import { useAuth } from '../../../providers/AuthProvider';
 import * as awarenessProtocol from 'y-protocols/awareness';
+import { ErrorBoundary } from '../../../components/common/ErrorBoundary';
 
 const getLanguageFromFileName = (fileName) => {
   if (!fileName) return 'plaintext';
@@ -81,6 +82,7 @@ export const CodeEditor = ({
   const latestFileRef = useRef(activeFile);
   const hoverDisposableRef = useRef(null);
   const remoteDecorationsRef = useRef([]);
+  const diffEditorRef = useRef(null);
   const [cursorStyles, setCursorStyles] = useState('');
   const [diffViewMode, setDiffViewMode] = useState('split'); // 'split' | 'inline' | 'editor'
 
@@ -484,16 +486,60 @@ export const CodeEditor = ({
     }
   };
 
+  // Safe helper to detach diff editor models before accepting/rejecting
+  const handleSafeAccept = (diff) => {
+    if (diffEditorRef.current) {
+      try {
+        diffEditorRef.current.setModel({ original: null, modified: null });
+      } catch (e) {
+        console.warn('DiffEditor detach on accept:', e);
+      }
+    }
+    onAcceptDiff?.(diff || pendingDiff);
+  };
+
+  const handleSafeReject = (diff) => {
+    if (diffEditorRef.current) {
+      try {
+        diffEditorRef.current.setModel({ original: null, modified: null });
+      } catch (e) {
+        console.warn('DiffEditor detach on reject:', e);
+      }
+    }
+    onRejectDiff?.(diff || pendingDiff);
+  };
+
+  // Cleanup DiffEditor on unmount or diff close
+  useEffect(() => {
+    return () => {
+      if (diffEditorRef.current) {
+        try {
+          const model = diffEditorRef.current.getModel();
+          diffEditorRef.current.setModel({ original: null, modified: null });
+          if (model?.original && !model.original.isDisposed()) {
+            model.original.dispose();
+          }
+          if (model?.modified && !model.modified.isDisposed()) {
+            model.modified.dispose();
+          }
+        } catch (e) {
+          console.warn('Safe DiffEditor cleanup:', e);
+        }
+        diffEditorRef.current = null;
+      }
+    };
+  }, [isDiffActive]);
+
   // Keyboard shortcuts for accepting/rejecting diffs
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (!isDiffActive) return;
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        onAcceptDiff?.(pendingDiff);
+        handleSafeAccept(pendingDiff);
       } else if (e.key === 'Escape') {
         e.preventDefault();
-        onRejectDiff?.(pendingDiff);
+        handleSafeReject(pendingDiff);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -565,7 +611,7 @@ export const CodeEditor = ({
 
             {/* Reject Button */}
             <button
-              onClick={() => onRejectDiff?.(pendingDiff)}
+              onClick={() => handleSafeReject(pendingDiff)}
               className="flex items-center space-x-1 px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 rounded text-xs transition-all shadow-sm font-medium active:scale-95"
               title="Discard AI proposed changes (Esc)"
             >
@@ -576,7 +622,7 @@ export const CodeEditor = ({
 
             {/* Accept Button */}
             <button
-              onClick={() => onAcceptDiff?.(pendingDiff)}
+              onClick={() => handleSafeAccept(pendingDiff)}
               className="flex items-center space-x-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs transition-all shadow-md font-semibold active:scale-95 border border-emerald-400/30"
               title="Accept and apply AI changes (Ctrl+Enter)"
             >
@@ -609,60 +655,68 @@ export const CodeEditor = ({
 
       {/* Editor Body */}
       <div className="flex-1 min-h-0 relative w-full h-full">
-        {isDiffActive && diffViewMode !== 'editor' ? (
-          <DiffEditor
-            original={pendingDiff.originalContent || ''}
-            modified={pendingDiff.newContent || ''}
-            language={getLanguageFromFileName(activeFile.name)}
-            theme="vs-dark"
-            options={{
-              renderSideBySide: diffViewMode === 'split',
-              readOnly: true,
-              minimap: { enabled: false },
-              fontSize: 15,
-              fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
-              padding: { top: 16, bottom: 16 },
-              scrollBeyondLastLine: false,
-              smoothScrolling: true,
-              originalEditable: false
-            }}
-            loading={
-              <div className="flex h-full items-center justify-center bg-[#1e1e1e]">
-                <div className="text-gray-400 text-[14px]">Loading AI Visual Diff...</div>
-              </div>
-            }
-          />
-        ) : (
-          <Editor
-            path={activeFile.id}
-            height="100%"
-            language={getLanguageFromFileName(activeFile.name)}
-            theme="vs-dark"
-            options={{
-              minimap: { enabled: true },
-              fontSize: 16,
-              fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
-              wordWrap: 'on',
-              lineNumbersMinChars: 3,
-              padding: { top: 20, bottom: 20 },
-              scrollBeyondLastLine: false,
-              smoothScrolling: true,
-              cursorBlinking: 'blink',
-              cursorSmoothCaretAnimation: 'off',
-              cursorWidth: 2,
-              formatOnPaste: true,
-              renderWhitespace: 'selection',
-              bracketPairColorization: { enabled: true },
-            }}
-            onMount={handleEditorDidMount}
-            onChange={handleEditorChange}
-            loading={
-              <div className="flex h-full items-center justify-center bg-[#1e1e1e]">
-                <div className="text-gray-400 text-[15px]">Loading Editor...</div>
-              </div>
-            }
-          />
-        )}
+        <ErrorBoundary>
+          {isDiffActive && diffViewMode !== 'editor' ? (
+            <DiffEditor
+              key={`diff-${pendingDiff.fileId || pendingDiff.filePath || 'active'}`}
+              original={pendingDiff.originalContent || ''}
+              modified={pendingDiff.newContent || ''}
+              language={getLanguageFromFileName(activeFile.name)}
+              theme="vs-dark"
+              keepCurrentOriginalModel={true}
+              keepCurrentModifiedModel={true}
+              onMount={(diffEditor) => {
+                diffEditorRef.current = diffEditor;
+              }}
+              options={{
+                renderSideBySide: diffViewMode === 'split',
+                readOnly: true,
+                minimap: { enabled: false },
+                fontSize: 15,
+                fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+                padding: { top: 16, bottom: 16 },
+                scrollBeyondLastLine: false,
+                smoothScrolling: true,
+                originalEditable: false
+              }}
+              loading={
+                <div className="flex h-full items-center justify-center bg-[#1e1e1e]">
+                  <div className="text-gray-400 text-[14px]">Loading AI Visual Diff...</div>
+                </div>
+              }
+            />
+          ) : (
+            <Editor
+              path={activeFile.id}
+              height="100%"
+              language={getLanguageFromFileName(activeFile.name)}
+              theme="vs-dark"
+              options={{
+                minimap: { enabled: true },
+                fontSize: 16,
+                fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+                wordWrap: 'on',
+                lineNumbersMinChars: 3,
+                padding: { top: 20, bottom: 20 },
+                scrollBeyondLastLine: false,
+                smoothScrolling: true,
+                cursorBlinking: 'blink',
+                cursorSmoothCaretAnimation: 'off',
+                cursorWidth: 2,
+                formatOnPaste: true,
+                renderWhitespace: 'selection',
+                bracketPairColorization: { enabled: true },
+              }}
+              onMount={handleEditorDidMount}
+              onChange={handleEditorChange}
+              loading={
+                <div className="flex h-full items-center justify-center bg-[#1e1e1e]">
+                  <div className="text-gray-400 text-[15px]">Loading Editor...</div>
+                </div>
+              }
+            />
+          )}
+        </ErrorBoundary>
       </div>
     </div>
   );

@@ -172,14 +172,23 @@ export const useVoiceRoom = (roomId, user) => {
   const joinVoice = useCallback(async () => {
     if (!roomId) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        },
-        video: false
-      });
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          },
+          video: false
+        });
+      } catch (constraintErr) {
+        // Fallback to basic audio if advanced hardware audio constraints are not supported
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: false
+        });
+      }
 
       localStreamRef.current = stream;
       setupAudioAnalysis(stream);
@@ -192,7 +201,13 @@ export const useVoiceRoom = (roomId, user) => {
 
     } catch (err) {
       console.error('Failed to access microphone or join voice:', err);
-      alert('Could not access microphone: ' + (err.message || 'Permission denied'));
+      let msg = err.message || 'Permission denied';
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || msg.toLowerCase().includes('permission')) {
+        msg = 'Microphone access is blocked. Please allow microphone permission in your browser address bar (click the 🔒 Lock or ⚙️ icon next to the URL) and check Windows Settings > Privacy & security > Microphone.';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        msg = 'No microphone hardware found. Please connect a microphone or headset to join the voice channel.';
+      }
+      alert(msg);
     }
   }, [roomId, user, setupAudioAnalysis]);
 

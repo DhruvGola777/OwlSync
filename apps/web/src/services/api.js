@@ -615,5 +615,55 @@ export const api = {
       console.error('Agent stream error:', err);
       onError?.(err);
     }
+  },
+
+  // Recordings API
+  async uploadRecording(formData) {
+    try {
+      const res = await apiClient.post('/recordings/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      return res.data.data.recording;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to upload recording'));
+    }
+  },
+
+  async getRecordings(params = {}) {
+    try {
+      const res = await apiClient.get('/recordings', { params });
+      return res.data.data.recordings;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to fetch recordings'));
+    }
+  },
+
+  async getRecording(id) {
+    try {
+      const res = await apiClient.get(`/recordings/${id}`);
+      return res.data.data.recording;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to fetch recording'));
+    }
+  },
+
+  async updateRecording(id, data) {
+    try {
+      const res = await apiClient.patch(`/recordings/${id}`, data);
+      return res.data.data.recording;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to update recording'));
+    }
+  },
+
+  async deleteRecording(id) {
+    try {
+      const res = await apiClient.delete(`/recordings/${id}`);
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to delete recording'));
+    }
   }
 };

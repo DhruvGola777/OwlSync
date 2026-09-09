@@ -277,7 +277,7 @@ export const SourceControlPanel = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#252526] w-80 shrink-0 border-r border-white/10 select-text overflow-hidden">
+    <div className="flex flex-col h-full bg-[#252526] w-full select-text overflow-hidden">
       {/* Top Header */}
       <div className="px-4 py-2.5 bg-[#1e1e1e] border-b border-white/10 flex items-center justify-between shrink-0">
         <div className="flex items-center space-x-2">

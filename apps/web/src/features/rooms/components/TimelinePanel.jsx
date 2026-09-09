@@ -7,7 +7,7 @@ import {
   VscComment, VscTrash, VscFolder, VscTerminal, VscPlay,
   VscFilter, VscPerson, VscHistory
 } from 'react-icons/vsc';
-import { Sparkles, User, Users, FileCode, CheckCircle2 } from 'lucide-react';
+import { Sparkles, User, Users, FileCode, CheckCircle2, X } from 'lucide-react';
 
 const getActivityIcon = (type) => {
   switch (type) {
@@ -38,7 +38,7 @@ const parseAuthor = (desc = '') => {
   return 'Collaborator';
 };
 
-export const TimelinePanel = ({ projectId, isProjectMode }) => {
+export const TimelinePanel = ({ projectId, isProjectMode, onClose }) => {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedAuthor, setSelectedAuthor] = useState('ALL');
@@ -121,14 +121,14 @@ export const TimelinePanel = ({ projectId, isProjectMode }) => {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-gray-500 bg-[#252526] h-full">
+      <div className="flex flex-col h-full w-full items-center justify-center text-sm text-gray-500 bg-[#252526]">
         Loading timeline & authorship...
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#252526] w-80 shrink-0 border-l border-white/10 select-text overflow-hidden">
+    <div className="flex flex-col h-full bg-[#252526] w-full select-text overflow-hidden">
       {/* Header */}
       <div className="px-4 py-2.5 bg-[#1e1e1e] border-b border-white/10 flex items-center justify-between shrink-0">
         <div className="flex items-center space-x-2">
@@ -142,9 +142,20 @@ export const TimelinePanel = ({ projectId, isProjectMode }) => {
             <p className="text-[10px] text-gray-400">Who wrote what & room history replay</p>
           </div>
         </div>
-        <span className="text-[10px] font-mono bg-white/10 px-1.5 py-0.5 rounded text-gray-300">
-          {activities.length} events
-        </span>
+        <div className="flex items-center space-x-2">
+          <span className="text-[10px] font-mono bg-white/10 px-1.5 py-0.5 rounded text-gray-300">
+            {activities.length} events
+          </span>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+              title="Close Panel"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Contributor Authorship Breakdown */}
