@@ -1,0 +1,162 @@
+services:
+  # ==========================================
+  # 1. Database (PostgreSQL 15)
+  # ==========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: owlsync-postgres-prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-root}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-owlsync}
+    volumes:
+      - postgres-prod-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-root} -d ${POSTGRES_DB:-owlsync}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # 2. In-Memory Cache & Distributed Lock (Redis 7)
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: owlsync-redis-prod
+    restart: always
+    volumes:
+      - redis-prod-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ==========================================
+  # 3. Message Broker (RabbitMQ 3)
+  # ==========================================
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: owlsync-rabbitmq-prod
+    restart: always
+    volumes:
+      - rabbitmq-prod-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # 4. Backend REST API (Node.js Express)
+  # ==========================================
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: owlsync-api-prod
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-root}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-owlsync}?schema=public
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-for-owlsync-prod}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  # ==========================================
+  # 5. Background Workers (RabbitMQ Consumers)
+  # ==========================================
+  workers:
+    build:
+      context: .
+      dockerfile: apps/workers/Dockerfile
+    container_name: owlsync-workers-prod
+    restart: always
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-root}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-owlsync}?schema=public
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://rabbitmq:5672
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  # ==========================================
+  # 6. Web Frontend (React Vite + Nginx)
+  # ==========================================
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: owlsync-web-prod
+    restart: always
+
+  # ==========================================
+  # 7. Nginx Gateway & Reverse Proxy
+  # ==========================================
+  nginx:
+    image: nginx:alpine
+    container_name: owlsync-nginx-gateway
+    restart: always
+    ports:
+      - '80:80'
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+      - web
+
+  # ==========================================
+  # 8. Prometheus Metrics Scraper
+  # ==========================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: owlsync-prometheus-prod
+    restart: always
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-prod-data:/prometheus
+    depends_on:
+      - api
+
+  # ==========================================
+  # 9. Grafana Dashboards
+  # ==========================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: owlsync-grafana-prod
+    restart: always
+    ports:
+      - '3001:3000'
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning
+      - grafana-prod-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres-prod-data:
+  redis-prod-data:
+  rabbitmq-prod-data:
+  prometheus-prod-data:
+  grafana-prod-data:

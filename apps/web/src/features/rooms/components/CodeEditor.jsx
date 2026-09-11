@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import Editor, { DiffEditor } from '@monaco-editor/react';
 import * as Y from 'yjs';
 import { MonacoBinding } from 'y-monaco';
-import { Sparkles, Check, X, Split, Columns2, Code2, ArrowRight, RotateCcw } from 'lucide-react';
+import { Sparkles, Check, X, Split, Columns2, Code2, ArrowRight, RotateCcw, Eye } from 'lucide-react';
 import { socketService } from '../../../services/socket';
 import { api } from '../../../services/api';
 import { useAuth } from '../../../providers/AuthProvider';
@@ -70,7 +70,8 @@ export const CodeEditor = ({
   onAcceptDiff,
   onRejectDiff,
   aiEditHistory = [],
-  onRollback
+  onRollback,
+  isReadOnly = false
 }) => {
   const { user } = useAuth();
   const editorRef = useRef(null);
@@ -653,6 +654,22 @@ export const CodeEditor = ({
         </div>
       )}
 
+      {/* Read-Only Viewing Mode Banner */}
+      {isReadOnly && (
+        <div className="bg-amber-950/70 border-b border-amber-500/40 px-4 py-2 flex items-center justify-between text-xs text-amber-200 shrink-0 select-none">
+          <div className="flex items-center space-x-2">
+            <span className="p-1 rounded-md bg-amber-500/20 text-amber-300">
+              <Eye size={14} />
+            </span>
+            <span className="font-semibold text-white">Viewing Mode (Read-Only)</span>
+            <span className="text-amber-300/80 hidden sm:inline">— You have read-only access in this room. Code edits are disabled.</span>
+          </div>
+          <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[10px] border border-amber-500/30 font-semibold">
+            VIEWER
+          </span>
+        </div>
+      )}
+
       {/* Editor Body */}
       <div className="flex-1 min-h-0 relative w-full h-full">
         <ErrorBoundary>
@@ -692,6 +709,7 @@ export const CodeEditor = ({
               language={getLanguageFromFileName(activeFile.name)}
               theme="vs-dark"
               options={{
+                readOnly: isReadOnly,
                 minimap: { enabled: true },
                 fontSize: 16,
                 fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",

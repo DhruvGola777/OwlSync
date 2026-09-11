@@ -32,6 +32,10 @@ model User {
   messages           Message[]
   activities         Activity[]
   recordings         Recording[]
+  notifications      Notification[]
+  ownedTeams         Team[]          @relation("TeamOwner")
+  teamMemberships    TeamMember[]
+  badges             UserBadge[]
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 }
@@ -160,6 +164,8 @@ model Project {
   description String?
   ownerId     String
   owner       User     @relation("ProjectOwner", fields: [ownerId], references: [id])
+  teamId      String?
+  team        Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
   rooms       Room[]
   files       File[]
   note        Note?
@@ -213,19 +219,106 @@ model File {
 }
 
 model Recording {
-  id          String   @id @default(uuid())
-  title       String
-  description String?
-  filePath    String
-  url         String
-  duration    Int      @default(0) // Duration in seconds
-  size        Int?     // Size in bytes
-  mimeType    String   @default("video/webm")
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  roomId      String?
-  projectId   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  title        String
+  description  String?
+  filePath     String
+  url          String
+  thumbnailUrl String?  // Generated preview frame from video
+  duration     Int      @default(0) // Duration in seconds
+  size         Int?     // Size in bytes
+  mimeType     String   @default("video/webm")
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roomId       String?
+  projectId    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
+
+model AnalyticsEvent {
+  id          String   @id @default(uuid())
+  eventType   String   // e.g. "FILE_SAVE", "AI_QUERY", "ROOM_JOIN", "EXPORT_ZIP", "RECORDING_UPLOAD"
+  userId      String?
+  workspaceId String?
+  roomId      String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId, eventType])
+  @@index([userId, createdAt])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // e.g. "ROOM_INVITE", "FRIEND_REQUEST", "PROJECT_EXPORT", "ROLE_CHANGE", "SYSTEM", "TEAM_INVITE"
+  title     String
+  message   String
+  link      String?  // e.g. "/room/123", "/project/456", "/profile/alice", "/teams"
+  data      Json?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+}
+
+enum TeamRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model Team {
+  id          String       @id @default(uuid())
+  name        String
+  description String?
+  slug        String       @unique
+  avatarUrl   String?
+  ownerId     String
+  owner       User         @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     TeamMember[]
+  projects    Project[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model TeamMember {
+  id        String    @id @default(uuid())
+  teamId    String
+  team      Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      TeamRole  @default(MEMBER)
+  joinedAt  DateTime  @default(now())
+
+  @@unique([teamId, userId])
+}
+
+model Badge {
+  id          String      @id @default(uuid())
+  slug        String      @unique // e.g. "night-owl", "early-adopter", "master-collaborator", "code-virtuoso", "power-coder"
+  name        String
+  description String
+  icon        String      // Emoji or icon name
+  category    String      @default("ACHIEVEMENT")
+  createdAt   DateTime    @default(now())
+  userBadges  UserBadge[]
+}
+
+model UserBadge {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badgeId   String
+  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  awardedAt DateTime @default(now())
+
+  @@unique([userId, badgeId])
+}
+
+
+
 

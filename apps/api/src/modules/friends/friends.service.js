@@ -155,3 +155,31 @@ export const getPendingRequests = async (userId) => {
 
   return { incoming, outgoing };
 };
+
+export const inviteFriendToRoom = async (senderId, { friendId, roomId }) => {
+  if (!friendId || !roomId) {
+    throw new AppError('friendId and roomId are required', 400);
+  }
+
+  const [sender, room] = await Promise.all([
+    prisma.user.findUnique({ where: { id: senderId } }),
+    prisma.room.findUnique({ where: { id: roomId } })
+  ]);
+
+  if (!room) throw new AppError('Room not found', 404);
+
+  const senderName = sender.name || sender.username || 'A friend';
+
+  const { createNotification } = await import('../notifications/notifications.service.js');
+
+  const notification = await createNotification(friendId, {
+    type: 'ROOM_INVITE',
+    title: 'Live Coding Invite 🚀',
+    message: `${senderName} (@${sender.username}) invited you to collaborate in "${room.name}".`,
+    link: `/room/${roomId}`,
+    data: { roomId, senderId }
+  });
+
+  return { success: true, notification };
+};
+

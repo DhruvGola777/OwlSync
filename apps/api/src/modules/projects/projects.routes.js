@@ -1,6 +1,12 @@
 import express from 'express';
+import multer from 'multer';
 import { requireAuth } from '../../middlewares/requireAuth.js';
 import * as projectsController from './projects.controllers.js';
+
+const uploadZip = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB
+});
 
 const router = express.Router();
 
@@ -8,8 +14,11 @@ const router = express.Router();
 router.use(requireAuth);
 
 router.post('/', projectsController.createProject);
+router.post('/import/zip', uploadZip.single('file'), projectsController.importProjectZip);
+router.post('/import/folder', projectsController.importProjectFolder);
 router.get('/', projectsController.getProjects);
 router.get('/:id', projectsController.getProject);
+router.get('/:id/export', projectsController.exportProject);
 
 // File management within a project
 router.post('/:id/files', projectsController.createFile);

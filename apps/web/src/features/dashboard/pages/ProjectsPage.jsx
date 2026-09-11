@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../../services/api';
 import { useNavigate } from 'react-router-dom';
-import { Code2, Plus, Loader2, Search } from 'lucide-react';
+import { Code2, Plus, Loader2, Search, FolderUp } from 'lucide-react';
+import { ImportProjectModal } from '../components/ImportProjectModal';
 
 export const ProjectsPage = () => {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ export const ProjectsPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -70,7 +72,7 @@ export const ProjectsPage = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Your Projects</h1>
-          <p className="text-slate-600 mt-1">Manage your solo projects</p>
+          <p className="text-slate-600 mt-1">Manage your solo projects & imported repositories</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
           <div className="relative">
@@ -83,6 +85,13 @@ export const ProjectsPage = () => {
               className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-64"
             />
           </div>
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg transition font-medium shadow-sm"
+          >
+            <FolderUp size={18} className="text-slate-500" />
+            Import Project
+          </button>
           <button
             onClick={() => setShowCreateModal(true)}
             className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium shadow-sm shadow-indigo-200"
@@ -100,14 +109,24 @@ export const ProjectsPage = () => {
           </div>
           <h2 className="text-xl font-bold text-slate-800 mb-2">No projects yet</h2>
           <p className="text-slate-500 mb-6 max-w-sm mx-auto">
-            Create a new project to start coding solo.
+            Create a blank project or import your local codebase from your PC.
           </p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium transition shadow-md shadow-indigo-200"
-          >
-            New Project
-          </button>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition shadow-sm flex items-center gap-2"
+            >
+              <FolderUp size={18} className="text-slate-500" />
+              Import Local Code
+            </button>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium transition shadow-md shadow-indigo-200 flex items-center gap-2"
+            >
+              <Plus size={18} />
+              New Blank Project
+            </button>
+          </div>
         </div>
       ) : filteredProjects.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-sm mb-8">
@@ -140,6 +159,7 @@ export const ProjectsPage = () => {
         </div>
       )}
 
+      {/* Create Project Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl">
@@ -182,6 +202,13 @@ export const ProjectsPage = () => {
           </div>
         </div>
       )}
+
+      {/* Import Project Modal (ZIP & Folder) */}
+      <ImportProjectModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onProjectCreated={(newProj) => setProjects([newProj, ...projects])}
+      />
     </div>
   );
 };

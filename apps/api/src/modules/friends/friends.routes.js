@@ -8,6 +8,7 @@ const router = Router();
 router.use(requireAuth);
 
 router.post('/request', friendsController.sendFriendRequest);
+router.post('/invite-to-room', friendsController.inviteToRoom);
 router.post('/:id/accept', friendsController.acceptRequest);
 router.post('/:id/decline', friendsController.declineRequest);
 router.get('/', friendsController.getFriends);

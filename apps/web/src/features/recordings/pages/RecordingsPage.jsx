@@ -219,6 +219,7 @@ export const RecordingsPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredRecordings.map((rec) => {
             const videoUrl = `http://localhost:4000${rec.url}`;
+            const thumbUrl = rec.thumbnailUrl ? `http://localhost:4000${rec.thumbnailUrl}` : null;
             const sizeMB = rec.size ? (rec.size / (1024 * 1024)).toFixed(1) : '0';
             const timeAgo = rec.createdAt ? formatDistanceToNow(new Date(rec.createdAt), { addSuffix: true }) : '';
 
@@ -232,11 +233,22 @@ export const RecordingsPage = () => {
                   onClick={() => setSelectedRecording(rec)}
                   className="relative aspect-video bg-slate-900 cursor-pointer overflow-hidden flex items-center justify-center group/preview"
                 >
-                  <video 
-                    src={videoUrl}
-                    className="w-full h-full object-cover opacity-80 group-hover/preview:opacity-100 transition-opacity"
-                    preload="metadata"
-                  />
+                  {thumbUrl ? (
+                    <img
+                      src={thumbUrl}
+                      alt={rec.title}
+                      className="w-full h-full object-cover opacity-85 group-hover/preview:opacity-100 transition-opacity"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <video 
+                      src={videoUrl}
+                      className="w-full h-full object-cover opacity-80 group-hover/preview:opacity-100 transition-opacity"
+                      preload="metadata"
+                    />
+                  )}
                   
                   {/* Play Overlay Badge */}
                   <div className="absolute inset-0 bg-slate-950/40 group-hover/preview:bg-slate-950/20 transition-colors flex items-center justify-center">

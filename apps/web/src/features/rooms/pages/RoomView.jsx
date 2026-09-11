@@ -24,7 +24,8 @@ import { VoiceControlBar } from '../components/VoiceControlBar';
 import { RecordingModal } from '../components/RecordingModal';
 import { useVoiceRoom } from '../hooks/useVoiceRoom';
 import { useSessionRecorder } from '../hooks/useSessionRecorder';
-import { Sparkles, Film, StopCircle } from 'lucide-react';
+import { Sparkles, Film, StopCircle, BarChart3 } from 'lucide-react';
+import { AnalyticsModal } from '../../analytics/components/AnalyticsModal';
 
 export const RoomView = () => {
   const { id } = useParams();
@@ -42,6 +43,7 @@ export const RoomView = () => {
   // WebRTC Voice & Session Screen Recorder Hooks
   const voice = useVoiceRoom(isProjectMode ? null : id, user);
   const recorder = useSessionRecorder(voice.localStream);
+  const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
   
   // VS Code Layout State
   const [activityBarTab, setActivityBarTab] = useState('explorer'); // 'explorer', 'search'
@@ -495,6 +497,15 @@ export const RoomView = () => {
         });
         socket.on('room:user_left', ({ userId }) => setActiveUsers(prev => prev.filter(uid => uid !== userId)));
         socket.on('room:kicked', () => { alert('You have been kicked from the room.'); navigate('/'); });
+        socket.on('room:role_changed', ({ targetUserId, role }) => {
+          setRoom(prev => {
+            if (!prev || !prev.members) return prev;
+            return {
+              ...prev,
+              members: prev.members.map(m => (m.userId === targetUserId || m.user?.id === targetUserId) ? { ...m, role } : m)
+            };
+          });
+        });
         socket.on('chat:new_message', () => {
           if (activeSidebarRef.current !== 'chat') setUnreadCount(prev => prev + 1);
         });
@@ -604,6 +615,18 @@ export const RoomView = () => {
               </button>
             </div>
           )}
+
+          <div className="h-4 w-[1px] bg-white/10 shrink-0" />
+
+          {/* Analytics & Metrics Modal Trigger */}
+          <button
+            onClick={() => setShowAnalyticsModal(true)}
+            className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 hover:text-white border border-indigo-500/30 text-xs font-medium transition-all shadow-sm active:scale-95 shrink-0"
+            title="Real-time Workspace & Developer Analytics"
+          >
+            <BarChart3 className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="hidden sm:inline">Analytics</span>
+          </button>
 
           <div className="h-4 w-[1px] bg-white/10 shrink-0" />
 
@@ -902,6 +925,7 @@ export const RoomView = () => {
 
             {activityBarTab === 'explorer' && (
               <FileExplorer 
+                projectId={isProjectMode ? id : room.project?.id}
                 projectName={room.name}
                 files={room.project.files}
                 activeFileId={activeFileId}
@@ -976,22 +1000,32 @@ export const RoomView = () => {
                 onTabClose={handleTabClose}
               />
               <div className="flex-1 min-h-0 relative w-full h-full">
-                <CodeEditor 
-                  key={activeFileId}
-                  roomId={isProjectMode ? null : room.id} 
-                  projectId={isProjectMode ? id : room.project.id}
-                  activeFile={openFiles.find(f => f.id === activeFileId)}
-                  onSelectionChange={(text) => setSelectedCode(text)}
-                  pendingDiff={pendingDiff}
-                  onAcceptDiff={handleAcceptDiff}
-                  onRejectDiff={handleRejectDiff}
-                  aiEditHistory={aiEditHistory}
-                  onRollback={handleRollback}
-                  onOpenAI={(text) => {
-                    setSelectedCode(text);
-                    setRightPanel('ai');
-                  }}
-                />
+                {(() => {
+                  const isRoomOwner = !isProjectMode && room?.ownerId === user?.id;
+                  const currentMember = !isProjectMode && room?.members?.find(m => m.userId === user?.id || m.user?.id === user?.id);
+                  const currentUserRole = isProjectMode ? 'OWNER' : (isRoomOwner ? 'OWNER' : (currentMember?.role || 'MEMBER'));
+                  const isReadOnly = currentUserRole === 'GUEST' || currentUserRole === 'VIEWER';
+
+                  return (
+                    <CodeEditor 
+                      key={activeFileId}
+                      roomId={isProjectMode ? null : room.id} 
+                      projectId={isProjectMode ? id : room.project.id}
+                      activeFile={openFiles.find(f => f.id === activeFileId)}
+                      onSelectionChange={(text) => setSelectedCode(text)}
+                      pendingDiff={pendingDiff}
+                      onAcceptDiff={handleAcceptDiff}
+                      onRejectDiff={handleRejectDiff}
+                      aiEditHistory={aiEditHistory}
+                      onRollback={handleRollback}
+                      isReadOnly={isReadOnly}
+                      onOpenAI={(text) => {
+                        setSelectedCode(text);
+                        setRightPanel('ai');
+                      }}
+                    />
+                  );
+                })()}
               </div>
             </div>
           ) : (
@@ -1036,6 +1070,7 @@ export const RoomView = () => {
           <div className="flex flex-col h-full bg-[#252526] w-80 shrink-0 overflow-hidden border-l border-white/10 select-none relative">
             {!isProjectMode && rightPanel === 'members' && (
               <MembersPanel
+                roomId={room?.id}
                 activeUsers={activeUsers}
                 currentUser={user}
                 roomOwnerId={room?.ownerId}
@@ -1199,6 +1234,13 @@ export const RoomView = () => {
         projectId={isProjectMode ? id : room?.project?.id}
         roomName={room?.name}
         onDownload={recorder.downloadRecording}
+      />
+
+      {/* Developer & Workspace Analytics Modal */}
+      <AnalyticsModal
+        isOpen={showAnalyticsModal}
+        onClose={() => setShowAnalyticsModal(false)}
+        workspaceId={room?.project?.workspaceId || room?.id}
       />
     </div>
   );

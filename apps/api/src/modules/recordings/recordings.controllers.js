@@ -3,6 +3,8 @@ import path from 'path';
 import { PrismaClient } from '@prisma/client';
 import catchAsync from '../../utils/catchAsync.js';
 import AppError from '../../utils/AppError.js';
+import { publishToQueue } from '../../config/rabbitmq.js';
+import { trackEvent } from '../analytics/analytics.service.js';
 
 const prisma = new PrismaClient();
 
@@ -41,6 +43,19 @@ export const uploadRecording = catchAsync(async (req, res, next) => {
         select: { id: true, name: true, username: true, avatarUrl: true }
       }
     }
+  });
+
+  // Asynchronously generate video thumbnail via RabbitMQ
+  publishToQueue('thumbnail_queue', {
+    recordingId: recording.id,
+    filePath: recording.filePath
+  });
+
+  // Track telemetry event
+  trackEvent('RECORDING_UPLOAD', {
+    userId,
+    roomId: roomId || null,
+    metadata: { recordingId: recording.id, duration: durationSec, size: fileSize }
   });
 
   res.status(201).json({

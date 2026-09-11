@@ -210,29 +210,57 @@ export const FriendsMenu = () => {
                   <p className="text-sm text-gray-500 text-center py-2">No friends yet.</p>
                 ) : (
                   <div className="space-y-3">
-                    {friends.map(friend => (
-                      <div 
-                        key={friend.id} 
-                        className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 p-2 rounded-lg transition-colors -mx-2"
-                        onClick={() => {
-                          setIsOpen(false);
-                          navigate(`/profile/${friend.username}`);
-                        }}
-                      >
-                        <div className="relative">
-                          <AvatarDisplay avatarUrl={friend.avatarUrl} name={friend.name || friend.username} size={32} />
-                          {friend.status === 'ONLINE' && (
-                            <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white" />
+                    {friends.map(friend => {
+                      const currentPath = window.location.pathname;
+                      const inRoom = currentPath.startsWith('/room/');
+                      const currentRoomId = inRoom ? currentPath.split('/room/')[1]?.split('/')[0] : null;
+
+                      return (
+                        <div 
+                          key={friend.id} 
+                          className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors -mx-2"
+                        >
+                          <div 
+                            className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
+                            onClick={() => {
+                              setIsOpen(false);
+                              navigate(`/profile/${friend.username}`);
+                            }}
+                          >
+                            <div className="relative shrink-0">
+                              <AvatarDisplay avatarUrl={friend.avatarUrl} name={friend.name || friend.username} size={32} />
+                              {friend.status === 'ONLINE' && (
+                                <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white" />
+                              )}
+                            </div>
+                            <div className="truncate">
+                              <p className="text-sm font-medium text-gray-900 truncate">{friend.name || friend.username}</p>
+                              <p className="text-xs text-gray-500">
+                                {friend.status === 'ONLINE' ? 'Online' : (friend.lastSeen ? `Last seen ${formatDistanceToNow(new Date(friend.lastSeen), { addSuffix: true })}` : 'Offline')}
+                              </p>
+                            </div>
+                          </div>
+
+                          {inRoom && currentRoomId && (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  await api.inviteFriendToRoom(friend.id, currentRoomId);
+                                  alert(`Room invitation sent to ${friend.name || friend.username}!`);
+                                } catch (err) {
+                                  alert(err.message || 'Failed to send invite');
+                                }
+                              }}
+                              className="ml-2 px-2.5 py-1 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-md text-xs font-semibold transition shrink-0"
+                              title="Invite to current room"
+                            >
+                              Invite
+                            </button>
                           )}
                         </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{friend.name || friend.username}</p>
-                          <p className="text-xs text-gray-500">
-                            {friend.status === 'ONLINE' ? 'Online' : (friend.lastSeen ? `Last seen ${formatDistanceToNow(new Date(friend.lastSeen), { addSuffix: true })}` : 'Offline')}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

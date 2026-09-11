@@ -47,3 +47,13 @@ export const getPendingRequests = async (req, res, next) => {
     next(err);
   }
 };
+
+export const inviteToRoom = async (req, res, next) => {
+  try {
+    const result = await friendsService.inviteFriendToRoom(req.user.id, req.body);
+    res.status(200).json({ message: 'Room invite sent to friend', ...result });
+  } catch (err) {
+    next(err);
+  }
+};
+

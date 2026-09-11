@@ -11,3 +11,8 @@ build
 
 # Custom ignored folders
 demo/
+storage/
+**/storage/recordings/*
+!**/storage/recordings/.gitkeep
+*.webm
+*.mp4

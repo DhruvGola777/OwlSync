@@ -46,6 +46,7 @@ io.on('connection', async (socket) => {
   console.log(`User connected: ${userId} (Socket: ${socket.id})`);
 
   if (userId) {
+    socket.join(`user:${userId}`);
     try {
       // 1. Fast path: Track online status in Redis
       await pubClient.set(`user:${userId}:status`, 'ONLINE');

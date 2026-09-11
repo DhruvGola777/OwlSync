@@ -111,6 +111,63 @@ export const registerRoomHandlers = (io, socket) => {
     }
   });
 
+  socket.on('room:change_role', async ({ roomId, targetUserId, newRole }) => {
+    const userId = socket.user?.userId;
+    if (!userId || !roomId || !targetUserId || !newRole) return;
+
+    try {
+      // Verify requester is room owner
+      const room = await prisma.room.findUnique({ where: { id: roomId } });
+      if (!room || room.ownerId !== userId) {
+        return socket.emit('error', { message: 'Only the room host can change participant roles' });
+      }
+
+      // Map string roles to Prisma RoomRole enum
+      const roleMap = {
+        'HOST': 'OWNER',
+        'OWNER': 'OWNER',
+        'EDITOR': 'MEMBER',
+        'MEMBER': 'MEMBER',
+        'ADMIN': 'ADMIN',
+        'VIEWER': 'GUEST',
+        'GUEST': 'GUEST'
+      };
+      const mappedRole = roleMap[newRole.toUpperCase()] || 'MEMBER';
+
+      // Update room member in database
+      await prisma.roomMember.updateMany({
+        where: { roomId, userId: targetUserId },
+        data: { role: mappedRole }
+      });
+
+      // Broadcast role update to all room participants
+      io.to(roomId).emit('room:role_changed', {
+        roomId,
+        targetUserId,
+        role: mappedRole
+      });
+
+      // Create persistent notification and send to user
+      try {
+        const notif = await prisma.notification.create({
+          data: {
+            userId: targetUserId,
+            type: 'ROLE_CHANGE',
+            title: 'Room Permission Updated',
+            message: `Your permission in "${room.name}" was changed to ${mappedRole === 'GUEST' ? 'Viewer (Read-Only)' : 'Editor'}.`,
+            link: `/room/${roomId}`
+          }
+        });
+        io.to(`user:${targetUserId}`).emit('notification:new', notif);
+      } catch (nErr) {
+        console.error('Failed to create role change notification:', nErr);
+      }
+    } catch (error) {
+      console.error('Error changing user role:', error);
+      socket.emit('error', { message: 'Failed to change role' });
+    }
+  });
+
   socket.on('room:deleted', async ({ roomId }) => {
     const userId = socket.user?.userId;
     if (!userId) return;

@@ -1,10 +1,11 @@
 import { PrismaClient } from '@prisma/client';
 import * as otplib from 'otplib';
+import { CacheService } from '../../services/cache.service.js';
 
 const prisma = new PrismaClient();
 
 export const updateProfile = async (userId, data) => {
-  return prisma.user.update({
+  const updatedUser = await prisma.user.update({
     where: { id: userId },
     data: {
       ...data,
@@ -24,6 +25,14 @@ export const updateProfile = async (userId, data) => {
       isTwoFactorEnabled: true,
     }
   });
+
+  // Invalidate user profile caches
+  await CacheService.del(`user:${userId}`);
+  if (updatedUser.username) {
+    await CacheService.del(`user:profile:${updatedUser.username}`);
+  }
+
+  return updatedUser;
 };
 
 export const getUserSessions = async (userId) => {
@@ -69,13 +78,16 @@ export const deleteUser = async (userId) => {
 };
 
 export const searchUsers = async (query, excludeUserId) => {
-  return prisma.user.findMany({
-    where: {
-      username: { contains: query, mode: 'insensitive' },
-      id: { not: excludeUserId }
-    },
-    select: { username: true, name: true, avatarUrl: true },
-    take: 5
+  const cacheKey = `users:search:${query.toLowerCase().trim()}:${excludeUserId}`;
+  return CacheService.getOrSet(cacheKey, 30, async () => {
+    return prisma.user.findMany({
+      where: {
+        username: { contains: query, mode: 'insensitive' },
+        id: { not: excludeUserId }
+      },
+      select: { username: true, name: true, avatarUrl: true },
+      take: 5
+    });
   });
 };
 
@@ -174,7 +186,48 @@ export const getUserProfile = async (username, currentUserId) => {
     }
   }
 
-  return { ...targetUser, relationship, requestId, mutualFriends };
+  // Calculate real profile metrics & fetch recent activities
+  const [
+    roomsCreatedCount,
+    projectsCount,
+    friendsCount,
+    messagesCount,
+    recentActivities
+  ] = await Promise.all([
+    prisma.room.count({ where: { ownerId: targetUser.id } }),
+    prisma.project.count({ where: { ownerId: targetUser.id } }),
+    prisma.friendRequest.count({
+      where: {
+        OR: [{ senderId: targetUser.id }, { receiverId: targetUser.id }],
+        status: 'ACCEPTED'
+      }
+    }),
+    prisma.message.count({ where: { userId: targetUser.id } }),
+    prisma.activity.findMany({
+      where: { userId: targetUser.id },
+      orderBy: { createdAt: 'desc' },
+      take: 6,
+      include: {
+        project: {
+          select: { id: true, name: true }
+        }
+      }
+    })
+  ]);
+
+  return {
+    ...targetUser,
+    relationship,
+    requestId,
+    mutualFriends,
+    stats: {
+      roomsCreatedCount,
+      projectsCount,
+      friendsCount,
+      messagesCount
+    },
+    activities: recentActivities
+  };
 };
 
 export const blockUser = async (currentUserId, targetUserId) => {

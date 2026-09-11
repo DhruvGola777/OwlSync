@@ -2,6 +2,7 @@ import { AIService } from './ai.service.js';
 import { AgentService } from './agent.service.js';
 import catchAsync from '../../utils/catchAsync.js';
 import AppError from '../../utils/AppError.js';
+import { trackEvent } from '../analytics/analytics.service.js';
 
 export const handleAIChat = catchAsync(async (req, res, next) => {
   const { message, activeFile, selection, projectFiles, history } = req.body;
@@ -9,6 +10,11 @@ export const handleAIChat = catchAsync(async (req, res, next) => {
   if (!message) {
     return next(new AppError('Message is required', 400));
   }
+
+  trackEvent('AI_QUERY', {
+    userId: req.user?.id,
+    metadata: { type: 'chat', hasSelection: !!selection }
+  });
 
   const response = await AIService.chat({
     message,

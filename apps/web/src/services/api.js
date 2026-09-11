@@ -291,6 +291,16 @@ export const api = {
     }
   },
 
+  // Global Search
+  async globalSearch(query) {
+    try {
+      const res = await apiClient.get(`/search?q=${encodeURIComponent(query)}`);
+      return res.data.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to perform search'));
+    }
+  },
+
   // Projects
   async getProjects() {
     try {
@@ -307,6 +317,28 @@ export const api = {
       return res.data.data.project;
     } catch (error) {
       throw new Error(extractError(error, 'Failed to create project'));
+    }
+  },
+
+  async importProjectZip(formData) {
+    try {
+      const res = await apiClient.post('/projects/import/zip', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      return res.data.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to import project from ZIP'));
+    }
+  },
+
+  async importProjectFolder(data) {
+    try {
+      const res = await apiClient.post('/projects/import/folder', data);
+      return res.data.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to import project from folder'));
     }
   },
 
@@ -462,6 +494,15 @@ export const api = {
       return res.data;
     } catch (error) {
       throw new Error(extractError(error, 'Failed to decline friend request'));
+    }
+  },
+
+  async inviteFriendToRoom(friendId, roomId) {
+    try {
+      const res = await apiClient.post('/friends/invite-to-room', { friendId, roomId });
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to invite friend to room'));
     }
   },
 
@@ -665,5 +706,154 @@ export const api = {
     } catch (error) {
       throw new Error(extractError(error, 'Failed to delete recording'));
     }
+  },
+
+  async downloadProjectZip(projectId, projectName = 'project') {
+    try {
+      const response = await apiClient.get(`/projects/${projectId}/export`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: 'application/zip' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${projectName}.zip`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to export project ZIP'));
+    }
+  },
+
+  async getUserAnalytics() {
+    try {
+      const res = await apiClient.get('/analytics/user/summary');
+      return res.data.data.analytics;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to fetch user analytics'));
+    }
+  },
+
+  async getWorkspaceAnalytics(workspaceId) {
+    try {
+      const res = await apiClient.get(`/analytics/workspace/${workspaceId}`);
+      return res.data.data.analytics;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to fetch workspace analytics'));
+    }
+  },
+
+  // Notifications API
+  async getNotifications(limit = 20) {
+    try {
+      const res = await apiClient.get(`/notifications?limit=${limit}`);
+      return res.data.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to fetch notifications'));
+    }
+  },
+
+  async markNotificationRead(id) {
+    try {
+      const res = await apiClient.patch(`/notifications/${id}/read`);
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to mark notification as read'));
+    }
+  },
+
+  async markAllNotificationsRead() {
+    try {
+      const res = await apiClient.patch('/notifications/read-all');
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to mark all notifications as read'));
+    }
+  },
+
+  async deleteNotification(id) {
+    try {
+      const res = await apiClient.delete(`/notifications/${id}`);
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to delete notification'));
+    }
+  },
+
+  // Teams & Workspaces API
+  async getTeams() {
+    try {
+      const res = await apiClient.get('/teams');
+      return res.data.data.teams;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to fetch teams'));
+    }
+  },
+
+  async getTeam(id) {
+    try {
+      const res = await apiClient.get(`/teams/${id}`);
+      return res.data.data.team;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to fetch team details'));
+    }
+  },
+
+  async createTeam(data) {
+    try {
+      const res = await apiClient.post('/teams', data);
+      return res.data.data.team;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to create team'));
+    }
+  },
+
+  async addTeamMember(teamId, data) {
+    try {
+      const res = await apiClient.post(`/teams/${teamId}/members`, data);
+      return res.data.data.member;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to add team member'));
+    }
+  },
+
+  async removeTeamMember(teamId, userId) {
+    try {
+      const res = await apiClient.delete(`/teams/${teamId}/members/${userId}`);
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to remove team member'));
+    }
+  },
+
+  async deleteTeam(teamId) {
+    try {
+      const res = await apiClient.delete(`/teams/${teamId}`);
+      return res.data;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to delete team'));
+    }
+  },
+
+  // Badges & Gamification API
+  async getBadges() {
+    try {
+      const res = await apiClient.get('/badges');
+      return res.data.data.badges;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to fetch badges'));
+    }
+  },
+
+  async getUserBadges(username) {
+    try {
+      const res = await apiClient.get(`/badges/user/${encodeURIComponent(username)}`);
+      return res.data.data.badges;
+    } catch (error) {
+      throw new Error(extractError(error, 'Failed to fetch user badges'));
+    }
   }
 };
+

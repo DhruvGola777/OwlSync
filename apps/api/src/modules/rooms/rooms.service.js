@@ -1,105 +1,114 @@
 import { PrismaClient } from '@prisma/client';
 import bcryptjs from 'bcryptjs';
 import AppError from '../../utils/AppError.js';
+import { DistributedLockService } from '../../services/distributedLock.service.js';
+import { CacheService } from '../../services/cache.service.js';
 
 const prisma = new PrismaClient();
 
 export const createRoom = async ({ name, description, password, ownerId, projectId }) => {
-  let hashedPassword = null;
-  if (password) {
-    hashedPassword = await bcryptjs.hash(password, 10);
-  }
+  return DistributedLockService.withLock(`room:create:${ownerId}`, 5000, async () => {
+    let hashedPassword = null;
+    if (password) {
+      hashedPassword = await bcryptjs.hash(password, 10);
+    }
 
-  let finalProjectId = projectId;
-  if (!finalProjectId) {
-    const project = await prisma.project.create({
-      data: {
-        name: `${name} Project`,
-        description: description || `Project environment for ${name}`,
-        ownerId,
-        files: {
-          create: [
-            {
-              name: 'index.js',
-              path: '/index.js',
-              content: `// Welcome to ${name} on OwlSync!\nconsole.log("Hello from OwlSync Room!");\n`
-            },
-            {
-              name: 'package.json',
-              path: '/package.json',
-              content: `{\n  "name": "${name.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'owlsync-app'}",\n  "version": "1.0.0",\n  "main": "index.js",\n  "scripts": {\n    "start": "node index.js"\n  }\n}\n`
-            },
-            {
-              name: 'README.md',
-              path: '/README.md',
-              content: `# ${name}\n\nCollaborative room project created on OwlSync.\n`
+    let finalProjectId = projectId;
+    if (!finalProjectId) {
+      const project = await prisma.project.create({
+        data: {
+          name: `${name} Project`,
+          description: description || `Project environment for ${name}`,
+          ownerId,
+          files: {
+            create: [
+              {
+                name: 'index.js',
+                path: '/index.js',
+                content: `// Welcome to ${name} on OwlSync!\nconsole.log("Hello from OwlSync Room!");\n`
+              },
+              {
+                name: 'package.json',
+                path: '/package.json',
+                content: `{\n  "name": "${name.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'owlsync-app'}",\n  "version": "1.0.0",\n  "main": "index.js",\n  "scripts": {\n    "start": "node index.js"\n  }\n}\n`
+              },
+              {
+                name: 'README.md',
+                path: '/README.md',
+                content: `# ${name}\n\nCollaborative room project created on OwlSync.\n`
+              }
+            ]
+          },
+          whiteboard: {
+            create: {
+              state: ''
             }
-          ]
-        },
-        whiteboard: {
-          create: {
-            state: ''
+          },
+          note: {
+            create: {
+              content: `# Meeting Notes for ${name}\n\n- Discuss architecture\n- Pair program features\n`
+            }
           }
-        },
-        note: {
+        }
+      });
+      finalProjectId = project.id;
+    }
+
+    const createdRoom = await prisma.room.create({
+      data: {
+        name,
+        description,
+        password: hashedPassword,
+        ownerId,
+        projectId: finalProjectId,
+        members: {
           create: {
-            content: `# Meeting Notes for ${name}\n\n- Discuss architecture\n- Pair program features\n`
+            userId: ownerId,
+            role: 'OWNER'
           }
+        }
+      },
+      include: {
+        owner: {
+          select: { id: true, username: true, name: true, avatarUrl: true }
+        },
+        _count: {
+          select: { members: true }
+        },
+        project: {
+          include: { files: true }
         }
       }
     });
-    finalProjectId = project.id;
-  }
 
-  return prisma.room.create({
-    data: {
-      name,
-      description,
-      password: hashedPassword,
-      ownerId,
-      projectId: finalProjectId,
-      members: {
-        create: {
-          userId: ownerId,
-          role: 'OWNER'
-        }
-      }
-    },
-    include: {
-      owner: {
-        select: { id: true, username: true, name: true, avatarUrl: true }
-      },
-      _count: {
-        select: { members: true }
-      },
-      project: {
-        include: { files: true }
-      }
-    }
+    // Invalidate public room listing cache
+    await CacheService.del('rooms:public:list');
+
+    return createdRoom;
   });
 };
 
 export const getRooms = async () => {
-  // Return all rooms for Phase 1. 
-  // We attach a boolean flag indicating if it's password protected.
-  const rooms = await prisma.room.findMany({
-    orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      createdAt: true,
-      password: true, // We will map this to a boolean before returning
-      owner: { select: { id: true, username: true, name: true, avatarUrl: true } },
-      _count: { select: { members: true } },
-    }
-  });
+  return CacheService.getOrSet('rooms:public:list', 30, async () => {
+    const rooms = await prisma.room.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        createdAt: true,
+        password: true,
+        owner: { select: { id: true, username: true, name: true, avatarUrl: true } },
+        _count: { select: { members: true } },
+      }
+    });
 
-  return rooms.map(room => ({
-    ...room,
-    isProtected: !!room.password,
-    password: undefined // Don't send hash to client
-  }));
+    return rooms.map(room => ({
+      ...room,
+      isProtected: !!room.password,
+      password: undefined
+    }));
+  });
 };
 
 export const getRoomById = async (roomId) => {
@@ -175,53 +184,54 @@ export const getRoomById = async (roomId) => {
 };
 
 export const joinRoom = async ({ roomId, userId, password }) => {
-  const room = await prisma.room.findUnique({ where: { id: roomId } });
-  
-  if (!room) {
-    throw new AppError('Room not found', 404);
-  }
-
-  // Check if already a member
-  const existingMember = await prisma.roomMember.findUnique({
-    where: {
-      roomId_userId: { roomId, userId }
+  return DistributedLockService.withLock(`room:join:${roomId}:${userId}`, 4000, async () => {
+    const room = await prisma.room.findUnique({ where: { id: roomId } });
+    
+    if (!room) {
+      throw new AppError('Room not found', 404);
     }
-  });
 
-  if (existingMember) {
-    return { message: 'Already joined', member: existingMember };
-  }
-
-  // Validate password if room is private
-  if (room.password) {
-    if (!password) {
-      throw new AppError('This room requires a password', 401);
-    }
-    const isValid = await bcryptjs.compare(password, room.password);
-    if (!isValid) {
-      throw new AppError('Incorrect password', 401);
-    }
-  }
-
-  try {
-    const member = await prisma.roomMember.create({
-      data: {
-        roomId,
-        userId,
-        role: 'MEMBER'
+    // Check if already a member
+    const existingMember = await prisma.roomMember.findUnique({
+      where: {
+        roomId_userId: { roomId, userId }
       }
     });
-    return { message: 'Successfully joined the room', member };
-  } catch (error) {
-    if (error.code === 'P2002') {
-      // Race condition fallback: already joined
-      const existingMember = await prisma.roomMember.findUnique({
-        where: { roomId_userId: { roomId, userId } }
-      });
+
+    if (existingMember) {
       return { message: 'Already joined', member: existingMember };
     }
-    throw error;
-  }
+
+    // Validate password if room is private
+    if (room.password) {
+      if (!password) {
+        throw new AppError('This room requires a password', 401);
+      }
+      const isValid = await bcryptjs.compare(password, room.password);
+      if (!isValid) {
+        throw new AppError('Incorrect password', 401);
+      }
+    }
+
+    try {
+      const member = await prisma.roomMember.create({
+        data: {
+          roomId,
+          userId,
+          role: 'MEMBER'
+        }
+      });
+      return { message: 'Successfully joined the room', member };
+    } catch (error) {
+      if (error.code === 'P2002') {
+        const existingMember = await prisma.roomMember.findUnique({
+          where: { roomId_userId: { roomId, userId } }
+        });
+        return { message: 'Already joined', member: existingMember };
+      }
+      throw error;
+    }
+  });
 };
 
 export const leaveRoom = async (roomId, userId) => {
@@ -273,9 +283,14 @@ export const deleteRoom = async (roomId, userId) => {
     throw new AppError('Only the room owner can delete the room', 403);
   }
 
-  return prisma.room.delete({
+  const deleted = await prisma.room.delete({
     where: { id: roomId }
   });
+
+  // Invalidate public room listing cache
+  await CacheService.del('rooms:public:list');
+
+  return deleted;
 };
 
 export const getRoomMessages = async (roomId, userId) => {

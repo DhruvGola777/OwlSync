@@ -1,8 +1,10 @@
 import React from 'react';
-import { Mic, MicOff, VolumeX, PhoneOff, Shield, Users, Radio, X, PhoneCall, Volume2 } from 'lucide-react';
+import { Mic, MicOff, VolumeX, PhoneOff, Shield, Users, Radio, X, PhoneCall, Volume2, UserCheck, Eye, UserMinus } from 'lucide-react';
 import AvatarDisplay from '../../../components/ui/AvatarDisplay';
+import { socketService } from '../../../services/socket';
 
 export const MembersPanel = ({
+  roomId,
   activeUsers = [],
   currentUser,
   roomOwnerId,
@@ -14,10 +16,14 @@ export const MembersPanel = ({
   const inVoice = voice?.inVoice || false;
   const voiceUsers = voice?.voiceUsers || [];
   const mutedPeerSocketIds = voice?.mutedPeerSocketIds || new Set();
+  const socket = socketService.getSocket();
 
-  // Helper to resolve real user profile data (name, username, avatar)
+  // Helper to resolve real user profile data (name, username, avatar, role)
   const resolveUser = (u) => {
     const uId = typeof u === 'string' ? u : (u?.id || u?.userId);
+    const member = roomMembers?.find(m => m.user?.id === uId || m.userId === uId || m.id === uId);
+    const isOwner = uId === roomOwnerId || member?.role === 'OWNER';
+    const role = isOwner ? 'OWNER' : (member?.role || 'MEMBER');
 
     if (currentUser?.id && uId === currentUser.id) {
       return {
@@ -26,11 +32,11 @@ export const MembersPanel = ({
         username: currentUser.username || '',
         avatarUrl: currentUser.avatarUrl,
         isCurrent: true,
-        isHost: currentUser.id === roomOwnerId,
+        isHost: isOwner,
+        role
       };
     }
 
-    const member = roomMembers?.find(m => m.user?.id === uId || m.userId === uId || m.id === uId);
     if (member?.user) {
       return {
         id: member.user.id,
@@ -38,7 +44,8 @@ export const MembersPanel = ({
         username: member.user.username || '',
         avatarUrl: member.user.avatarUrl,
         isCurrent: member.user.id === currentUser?.id,
-        isHost: member.user.id === roomOwnerId || member.role === 'OWNER',
+        isHost: isOwner,
+        role
       };
     }
 
@@ -49,22 +56,19 @@ export const MembersPanel = ({
         username: u.username || '',
         avatarUrl: u.avatarUrl,
         isCurrent: uId === currentUser?.id,
-        isHost: uId === roomOwnerId,
+        isHost: isOwner,
+        role
       };
     }
 
-    // Default fallback to current user's name if matching, or friendly label
-    const fallbackName = (currentUser?.id && uId === currentUser.id)
-      ? (currentUser.name || currentUser.username || 'You')
-      : (currentUser?.name || 'Dhruv Gola');
-
     return {
       id: uId,
-      name: fallbackName,
+      name: (currentUser?.id && uId === currentUser.id) ? (currentUser.name || 'You') : 'Collaborator',
       username: '',
       avatarUrl: null,
       isCurrent: uId === currentUser?.id,
-      isHost: uId === roomOwnerId,
+      isHost: isOwner,
+      role
     };
   };
 
@@ -401,23 +405,53 @@ export const MembersPanel = ({
               otherMembersList.map((m) => {
                 const isOnline = activeUserIds.has(m.id);
 
+                const isViewer = m.role === 'GUEST';
+
+                const handleToggleRole = () => {
+                  if (!socket || !roomId) return;
+                  const newRole = isViewer ? 'MEMBER' : 'GUEST';
+                  socket.emit('room:change_role', {
+                    roomId,
+                    targetUserId: m.id,
+                    newRole
+                  });
+                };
+
+                const handleKick = () => {
+                  if (!socket || !roomId) return;
+                  if (window.confirm(`Kick ${m.name} from this room?`)) {
+                    socket.emit('room:kick_user', {
+                      roomId,
+                      targetUserId: m.id
+                    });
+                  }
+                };
+
                 return (
-                  <div key={m.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-all">
-                    <div className="flex items-center space-x-2.5 min-w-0">
-                      <div className="relative">
-                        <AvatarDisplay avatarUrl={m.avatarUrl} name={m.name} size={26} />
+                  <div key={m.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-all gap-2">
+                    <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+                      <div className="relative shrink-0">
+                        <AvatarDisplay avatarUrl={m.avatarUrl} name={m.name} size={28} />
                         <div className={`w-2 h-2 rounded-full absolute -bottom-0.5 -right-0.5 ring-2 ring-[#1e1e24] ${
                           isOnline ? 'bg-emerald-500' : 'bg-gray-500'
                         }`} />
                       </div>
 
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-xs text-gray-200 font-medium truncate">{m.name}</span>
                           {m.isCurrent && <span className="text-[9px] bg-indigo-500/30 text-indigo-300 px-1 py-0.2 rounded font-mono">You</span>}
-                          {m.isHost && (
-                            <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1 py-0.2 rounded font-mono border border-amber-500/30 flex items-center gap-0.5">
+                          {m.isHost ? (
+                            <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-mono border border-amber-500/30 flex items-center gap-0.5">
                               <Shield className="w-2.5 h-2.5" /> Host
+                            </span>
+                          ) : isViewer ? (
+                            <span className="text-[9px] bg-slate-500/20 text-slate-300 px-1.5 py-0.5 rounded font-mono border border-slate-500/30 flex items-center gap-0.5">
+                              <Eye className="w-2.5 h-2.5" /> Viewer
+                            </span>
+                          ) : (
+                            <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono border border-emerald-500/30 flex items-center gap-0.5">
+                              <UserCheck className="w-2.5 h-2.5" /> Editor
                             </span>
                           )}
                         </div>
@@ -431,11 +465,34 @@ export const MembersPanel = ({
                       </div>
                     </div>
 
-                    {isOnline && (
-                      <span className="text-[10px] bg-white/5 text-gray-400 px-2 py-0.5 rounded font-mono border border-white/10">
+                    {/* Host action controls */}
+                    {isHost && !m.isCurrent ? (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={handleToggleRole}
+                          className={`px-2 py-1 rounded text-[10px] font-medium transition flex items-center gap-1 border ${
+                            isViewer
+                              ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border-emerald-500/40'
+                              : 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border-amber-500/40'
+                          }`}
+                          title={isViewer ? "Grant Editor Access" : "Set to Read-Only Viewer"}
+                        >
+                          {isViewer ? <UserCheck size={11} /> : <Eye size={11} />}
+                          <span>{isViewer ? 'Make Editor' : 'Make Viewer'}</span>
+                        </button>
+                        <button
+                          onClick={handleKick}
+                          className="p-1 rounded text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition"
+                          title="Kick user"
+                        >
+                          <UserMinus size={13} />
+                        </button>
+                      </div>
+                    ) : isOnline ? (
+                      <span className="text-[10px] bg-white/5 text-gray-400 px-2 py-0.5 rounded font-mono border border-white/10 shrink-0">
                         In Room
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 );
               })

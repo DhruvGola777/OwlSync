@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   VscChevronRight, VscChevronDown, VscNewFile, VscNewFolder, VscTrash,
-  VscFile, VscFolder, VscFolderOpened
+  VscFile, VscFolder, VscFolderOpened, VscCloudDownload
 } from 'react-icons/vsc';
 import { getFileIcon } from '../utils/fileIcons';
+import { api } from '../../../services/api';
 
 function buildFileTree(files) {
   const root = { name: 'root', type: 'folder', children: {}, path: '/' };
@@ -253,6 +254,7 @@ const FileNode = ({
 };
 
 export const FileExplorer = ({ 
+  projectId,
   projectName, 
   files, 
   activeFileId, 
@@ -267,6 +269,7 @@ export const FileExplorer = ({
   // { parentPath: string, type: 'file' | 'folder' } | null
   const [creatingState, setCreatingState] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Drag & Drop State
   const [draggedNode, setDraggedNode] = useState(null);
@@ -461,6 +464,27 @@ export const FileExplorer = ({
           >
             <VscNewFolder className="w-5 h-5" />
           </button>
+          {projectId && (
+            <button
+              onClick={async () => {
+                if (isExporting) return;
+                setIsExporting(true);
+                try {
+                  await api.downloadProjectZip(projectId, projectName || 'project');
+                } catch (err) {
+                  console.error('Failed to export project ZIP:', err);
+                  alert(err.message || 'Failed to export project');
+                } finally {
+                  setIsExporting(false);
+                }
+              }}
+              disabled={isExporting}
+              className="p-1 hover:bg-white/10 rounded text-gray-300 hover:text-white transition-colors disabled:opacity-50"
+              title={isExporting ? 'Compressing & Exporting ZIP...' : 'Export Project as ZIP'}
+            >
+              <VscCloudDownload className={`w-5 h-5 ${isExporting ? 'animate-bounce text-indigo-400' : ''}`} />
+            </button>
+          )}
         </div>
       </div>
 

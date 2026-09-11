@@ -9,6 +9,7 @@ export default function PublicProfile() {
   const { username } = useParams();
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
+  const [badges, setBadges] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
@@ -16,8 +17,12 @@ export default function PublicProfile() {
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const data = await api.getPublicProfile(username);
+      const [data, userBadges] = await Promise.all([
+        api.getPublicProfile(username),
+        api.getUserBadges(username).catch(() => [])
+      ]);
       setProfile(data);
+      setBadges(userBadges || []);
       setError('');
     } catch (err) {
       setError(err.message || 'User not found');
@@ -195,16 +200,8 @@ export default function PublicProfile() {
 
             <div className="mt-6 flex flex-wrap gap-x-6 gap-y-4 text-sm text-slate-500">
               <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-slate-400" />
-                <span>Internet Explorer</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <LinkIcon className="h-4 w-4 text-slate-400" />
-                <a href="#" className="text-indigo-600 hover:underline">owlsync.com/@{profile.username}</a>
-              </div>
-              <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-slate-400" />
-                <span>Last seen {profile.status === 'ONLINE' ? 'now' : formatDistanceToNow(new Date(profile.lastSeen), { addSuffix: true })}</span>
+                <span>Last seen {profile.status === 'ONLINE' ? 'Active now' : formatDistanceToNow(new Date(profile.lastSeen), { addSuffix: true })}</span>
               </div>
             </div>
 
@@ -238,42 +235,109 @@ export default function PublicProfile() {
           </div>
         </div>
 
-        {/* Demo Stats Section */}
-        <div className="grid grid-cols-3 divide-x divide-slate-100 border-t border-slate-100 bg-slate-50">
+        {/* Real Dynamic Stats Section */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-slate-100 border-t border-slate-100 bg-slate-50">
           <div className="p-6 text-center">
-            <div className="text-2xl font-bold tracking-tight text-slate-900">42</div>
+            <div className="text-2xl font-bold tracking-tight text-slate-900">
+              {profile.stats?.roomsCreatedCount ?? 0}
+            </div>
             <div className="mt-1 text-xs font-medium uppercase tracking-wider text-slate-500">Rooms Created</div>
           </div>
           <div className="p-6 text-center">
-            <div className="text-2xl font-bold tracking-tight text-slate-900">128</div>
+            <div className="text-2xl font-bold tracking-tight text-slate-900">
+              {profile.stats?.projectsCount ?? 0}
+            </div>
+            <div className="mt-1 text-xs font-medium uppercase tracking-wider text-slate-500">Projects</div>
+          </div>
+          <div className="p-6 text-center">
+            <div className="text-2xl font-bold tracking-tight text-slate-900">
+              {profile.stats?.friendsCount ?? 0}
+            </div>
             <div className="mt-1 text-xs font-medium uppercase tracking-wider text-slate-500">Friends</div>
           </div>
           <div className="p-6 text-center">
-            <div className="text-2xl font-bold tracking-tight text-slate-900">8.4k</div>
-            <div className="mt-1 text-xs font-medium uppercase tracking-wider text-slate-500">Messages</div>
+            <div className="text-2xl font-bold tracking-tight text-slate-900">
+              {profile.stats?.messagesCount ?? 0}
+            </div>
+            <div className="mt-1 text-xs font-medium uppercase tracking-wider text-slate-500">Messages Sent</div>
           </div>
         </div>
       </div>
 
-      {/* Demo Recent Activity */}
+      {/* Badges Showcase */}
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+          <span>🏆</span>
+          Earned Badges & Achievements
+          <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+            {badges.length}
+          </span>
+        </h2>
+        
+        {badges.length === 0 ? (
+          <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-500 text-sm">
+            No badges unlocked yet. Collaborate in rooms and build projects to earn badges!
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {badges.map((b) => {
+              const badge = b.badge || b;
+              return (
+                <div 
+                  key={b.id || badge.id} 
+                  className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-indigo-200 transition flex items-start gap-3.5"
+                >
+                  <div className="text-3xl p-2 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                    {badge.icon || '🏅'}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-sm font-bold text-slate-900 truncate">{badge.name}</h4>
+                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{badge.description}</p>
+                    {b.awardedAt && (
+                      <span className="text-[10px] text-slate-400 mt-2 block">
+                        Unlocked {formatDistanceToNow(new Date(b.awardedAt), { addSuffix: true })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Real Activity Stream */}
       <div className="mt-8">
         <h2 className="text-lg font-semibold text-slate-900 mb-4">Recent Activity</h2>
         <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-          <ul className="divide-y divide-slate-100">
-            {[1, 2, 3].map((i) => (
-              <li key={i} className="flex gap-4 p-4 sm:p-6">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-indigo-50">
-                  <Check className="h-5 w-5 text-indigo-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-slate-900">
-                    Created a new room <span className="font-semibold">Project Kickoff {i}</span>
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">{i * 2} hours ago</p>
-                </div>
-              </li>
-            ))}
-          </ul>
+          {profile.activities && profile.activities.length > 0 ? (
+            <ul className="divide-y divide-slate-100">
+              {profile.activities.map((act) => (
+                <li key={act.id} className="flex gap-4 p-4 sm:p-6 items-center">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                    <Check className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-slate-900 font-medium">
+                      {act.description || act.type}
+                      {act.project && (
+                        <span className="text-indigo-600 font-semibold ml-1.5">
+                          in {act.project.name}
+                        </span>
+                      )}
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-400">
+                      {formatDistanceToNow(new Date(act.createdAt), { addSuffix: true })}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="p-8 text-center text-slate-500 text-sm">
+              No recent activity recorded yet for @{profile.username}.
+            </div>
+          )}
         </div>
       </div>
     </div>

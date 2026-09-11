@@ -102,7 +102,20 @@ export const registerEditorHandlers = (io, socket) => {
     socket.emit('editor:sync', { update: Array.from(state) });
   });
 
-  socket.on('editor:update', ({ roomId, update }) => {
+  socket.on('editor:update', async ({ roomId, update }) => {
+    const userId = socket.user?.userId;
+    if (userId) {
+      try {
+        const member = await prisma.roomMember.findUnique({
+          where: { roomId_userId: { roomId, userId } }
+        });
+        if (member && member.role === 'GUEST') {
+          // Read-only user, drop update
+          return socket.emit('editor:error', { message: 'You have read-only access in this room' });
+        }
+      } catch (err) {}
+    }
+
     const doc = docs.get(roomId);
     if (doc) {
       try {
