@@ -65,18 +65,18 @@ graph TB
 The diagram below details the client-to-socket event pipeline for WebRTC audio mesh signaling, session screen recording, and live code authorship inspection:
 
 ```mermaid
-flowchart TD
+flowchart TB
     subgraph WebClient ["OwlSync Web Client"]
-        SR["SessionRecorder Service<br/>(Export WebM / Preview)"]
+        SR["SessionRecorder Service (Export WebM / Preview)"]
         HVC["Header Voice & Rec Controls"]
         VM["VoiceManager & WebRTC Mesh"]
         TL["Timeline & Code Authorship"]
     end
 
     subgraph SocketServer ["OwlSync Socket.IO Server"]
-        AH["activity.handlers.js<br/>(Activity & Authorship Broadcast)"]
-        VH["voice.handlers.js<br/>(Signaling: offer / answer / ICE)"]
-        RH["room.handlers.js<br/>(Permission Drop-Guards)"]
+        AH["activity.handlers.js (Activity & Authorship Broadcast)"]
+        VH["voice.handlers.js (Signaling: offer / answer / ICE)"]
+        RH["room.handlers.js (Permission Drop-Guards)"]
     end
 
     HVC -->|Trigger Rec Start/Stop| SR
@@ -84,16 +84,6 @@ flowchart TD
     VM <-->|SDP Offer / Answer & ICE Candidates| VH
     TL <-->|Sync Activity History & Authorship Badges| AH
     TL -->|Enforce Viewer / Editor Status| RH
-
-    style WebClient fill:#1e1e24,stroke:#4f46e5,stroke-width:2px,color:#fff
-    style SocketServer fill:#18181b,stroke:#06b6d4,stroke-width:2px,color:#fff
-    style SR fill:#27272a,stroke:#ef4444,stroke-width:1px,color:#fff
-    style VM fill:#27272a,stroke:#3b82f6,stroke-width:1px,color:#fff
-    style TL fill:#27272a,stroke:#10b981,stroke-width:1px,color:#fff
-    style HVC fill:#27272a,stroke:#f59e0b,stroke-width:1px,color:#fff
-    style AH fill:#3f3f46,stroke:#10b981,stroke-width:1px,color:#fff
-    style VH fill:#3f3f46,stroke:#3b82f6,stroke-width:1px,color:#fff
-    style RH fill:#3f3f46,stroke:#8b5cf6,stroke-width:1px,color:#fff
 ```
 
 ---

@@ -1,213 +1,197 @@
 # Software Design Document (SDD)
-## OwlSync — Real-Time Developer Collaboration & Cloud Workspace Platform
+## OwlSync — Distributed Real-Time Cloud IDE & Collaborative Workspace Architecture
 
 ---
 
-### Document Information
-- **Project**: OwlSync (formerly PairForge)
-- **Version**: 2.4.0 (Production Release)
-- **Architecture Style**: Modular Monorepo (Apps & Packages) with Distributed Microservices
-- **Status**: Complete & Production-Ready
+### Document Metadata
+- **Document Title**: OwlSync System Architecture & Engineering Design Specification
+- **Document ID**: SDD-OWLSYNC-2026-V2.4
+- **Target Audience**: Principal Engineers, Software Architects, Security Auditors, DevOps Teams
+- **Classification**: Production Engineering Reference
+- **Version**: 2.4.0 (Stable Release)
 
 ---
 
-## 1. Executive Summary & Vision
+## 1. Abstract & System Objectives
 
-**OwlSync** is an enterprise-grade developer collaboration platform that converges the core strengths of cloud IDEs (VS Code / Replit), collaborative canvas/documents (Google Docs / Excalidraw), asynchronous communication & presence (Discord / Slack), and AI pair programming (GitHub Copilot / Cursor) into an ultra-low latency, synchronized developer workspace.
+**OwlSync** is a cloud-native, distributed developer workspace designed for low-latency pair programming, voice communication, synchronous whiteboard drafting, in-browser virtual terminal execution, and context-aware AI assistance.
 
-### Core Objectives
-1. **Zero-Friction Collaboration**: Multiple developers can edit code, speak via WebRTC voice, brainstorm on synchronized whiteboards, and inspect live terminal execution simultaneously.
-2. **First-Class Project vs. Room Separation**: Projects represent persistent code assets and file structures, while Rooms represent ephemeral or persistent live sessions inside workspaces.
-3. **Resilient Distributed Architecture**: Offload long-running and heavy I/O tasks (email, thumbnail rendering, AI generation, project compression, analytics aggregation) to asynchronous RabbitMQ worker queues, keeping REST API and WebSocket threads at sub-5ms responsiveness.
-4. **Comprehensive Observability & Security**: End-to-end distributed locks via Redlock, Prometheus metrics exposition, Grafana observability dashboards, Swagger OpenAPI documentation, and Helmet/CORS security enforcement.
+### 1.1 Core Engineering Goals
+1. **Low-Latency Deterministic Synchronization**: Deliver sub-10ms localized keypress rendering and sub-50ms peer-to-peer document convergence using Conflict-Free Replicated Data Types (CRDTs).
+2. **High Availability & Fault Isolation**: Decouple stateless REST HTTP handlers from stateful real-time WebSocket connections and background asynchronous worker threads.
+3. **Strict Concurrency Guarantees**: Prevent multi-region and multi-instance race conditions using Redis-backed distributed locks (**Redlock Algorithm**) with atomic Lua release scripts.
+4. **Resilient Message-Driven Execution**: Utilize **RabbitMQ** for durable message queues, ensuring that intensive media processing, thumbnail rendering, ZIP extraction, and metrics rollups never block the primary event loops.
+5. **Turnkey Observability**: Provide native **Prometheus** metrics scraping endpoints and provisioned **Grafana** telemetry dashboards out of the box.
 
 ---
 
-## 2. High-Level System Architecture
+## 2. Architectural Paradigm & System Topology
 
-The following diagram illustrates the complete end-to-end topology across the client layer, API gateway/proxy, real-time WebSocket cluster, asynchronous message queues, persistent storage, and background processing workers:
+OwlSync is architected as a **Modular Monorepo** with explicit domain boundaries. Each component is independently scalable and deployable across containerized orchestrators.
 
 ```mermaid
-graph TD
-    subgraph Clients ["Client Layer (Web, Desktop & CLI)"]
-        Browser["OwlSync Web Client (React 18 + Vite + Monaco)"]
-        VoiceClient["WebRTC Voice Mesh (Audio Stream)"]
-        RecorderClient["Session Recorder (MediaStream WebM)"]
+flowchart TB
+    subgraph ClientLayer ["Client Ecosystem"]
+        WebIDE["Monaco Web IDE (React 18 / Vite)"]
+        WebRTCVoice["WebRTC Audio Mesh (P2P Audio)"]
+        RecorderEngine["Session Screen Recorder (MediaStream WebM)"]
+        VirtualTerminal["In-Browser POSIX Shell (Terminal)"]
     end
 
-    subgraph Ingress ["API Gateway & Reverse Proxy"]
-        Nginx["Nginx / Ingress Controller (Port 80/443)"]
+    subgraph IngressGateway ["Ingress & Reverse Proxy"]
+        Nginx["Nginx Gateway / Load Balancer (:80 / :443)"]
     end
 
-    subgraph ServiceLayer ["Core Application Services"]
-        APIServer["REST API Server (Express + Helmet - Port 4000)"]
-        SocketServer["Socket.IO Server (Yjs / Presence - Port 4001)"]
+    subgraph ServiceCluster ["Core Application Tier"]
+        REST_API["REST API Microservice (Express / Helmet :4000)"]
+        WS_Gateway["Real-Time Socket Server (Socket.IO / Yjs :4001)"]
     end
 
-    subgraph StateStorage ["Caching & Data Layer"]
-        PG[(PostgreSQL 15 Database)]
-        Redis[(Redis 7 Cluster: Pub/Sub + Redlock + Presence)]
+    subgraph StorageTier ["Persistence & Cache Layer"]
+        PostgreSQL[("PostgreSQL 15 (Primary DB)")]
+        RedisCluster[("Redis 7 (Pub/Sub + Redlock)")]
     end
 
-    subgraph AsyncPipeline ["Message Broker & Workers"]
-        RMQ{{RabbitMQ 3 Message Broker}}
-        EmailWorker["Email Worker"]
-        ThumbnailWorker["Thumbnail & Media Worker"]
-        CompressWorker["Project Compression Worker"]
-        AnalyticsWorker["Analytics Aggregator Worker"]
+    subgraph WorkerPool ["RabbitMQ Worker Pool"]
+        RabbitMQ_Broker{{"RabbitMQ Message Broker"}}
+        Worker_Email["Email Worker"]
+        Worker_Thumbnail["Media Worker"]
+        Worker_Compression["ZIP Exporter Worker"]
+        Worker_Analytics["Telemetry Worker"]
     end
 
-    subgraph ObservabilityStack ["Monitoring & Docs"]
-        Prometheus["Prometheus TSDB (Port 9090)"]
-        Grafana["Grafana Dashboards (Port 3001)"]
-        SwaggerUI["Swagger OpenAPI Spec (/api-docs)"]
+    subgraph ObservabilityLayer ["Observability"]
+        Prometheus["Prometheus TSDB (:9090)"]
+        Grafana["Grafana Telemetry (:3001)"]
     end
 
-    Browser -->|HTTP/REST /api/*| Nginx
-    Browser -->|WebSocket Connection| Nginx
-    VoiceClient <-->|Peer-to-Peer Audio Mesh| VoiceClient
+    WebIDE -->|HTTP REST| Nginx
+    WebIDE -->|WebSocket Stream| Nginx
+    WebRTCVoice <-->|P2P Voice Mesh| WebRTCVoice
 
-    Nginx -->|Proxy REST| APIServer
-    Nginx -->|Proxy WS| SocketServer
+    Nginx -->|/api/*| REST_API
+    Nginx -->|/socket.io/*| WS_Gateway
 
-    APIServer -->|Prisma ORM| PG
-    APIServer -->|Cache & Distributed Locks| Redis
-    APIServer -->|Publish Job Tasks| RMQ
+    REST_API -->|Prisma Transactions| PostgreSQL
+    REST_API -->|Locks & Session Cache| RedisCluster
+    REST_API -->|Enqueue Heavy Jobs| RabbitMQ_Broker
 
-    SocketServer -->|State Synchronization| Redis
-    SocketServer -->|Audit & Roles Query| PG
+    WS_Gateway -->|Redis Pub/Sub Adapter| RedisCluster
+    WS_Gateway -->|RBAC & Membership Queries| PostgreSQL
 
-    RMQ -->|Consume email_queue| EmailWorker
-    RMQ -->|Consume thumbnail_queue| ThumbnailWorker
-    RMQ -->|Consume compression_queue| CompressWorker
-    RMQ -->|Consume analytics_queue| AnalyticsWorker
+    RabbitMQ_Broker -->|email_queue| Worker_Email
+    RabbitMQ_Broker -->|thumbnail_queue| Worker_Thumbnail
+    RabbitMQ_Broker -->|compression_queue| Worker_Compression
+    RabbitMQ_Broker -->|analytics_queue| Worker_Analytics
 
-    EmailWorker -->|Log / SMTP Output| Browser
-    AnalyticsWorker -->|Persist Metrics| Redis
+    Worker_Analytics -->|Store Telemetry| RedisCluster
 
-    Prometheus -->|Scrape /metrics| APIServer
-    Grafana -->|Query Metrics| Prometheus
+    Prometheus -->|Scrape /metrics| REST_API
+    Grafana -->|Query Prometheus| Prometheus
 ```
 
 ---
 
-## 3. Real-Time Collaboration & Media Architecture
+## 3. Real-Time Collaboration & Media Protocols
 
-### 3.1 Collaborative Editor & Yjs CRDT Synchronization
-To achieve concurrent collaborative editing without destructive "last-write-wins" conflicts, OwlSync uses Conflict-free Replicated Data Types (CRDTs) powered by **Yjs** with Monaco Editor:
+### 3.1 Document Synchronization & CRDT Mechanics
+OwlSync uses **Yjs**—a high-performance CRDT framework with binary encoding. Document states are maintained as a sequence of immutable operations that commute:
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Alice as Alice (Client A)
-    participant MonacoA as Monaco Editor A
-    participant SocketA as Socket.IO Client A
-    participant SocketServer as OwlSync Socket Server
-    participant RedisPubSub as Redis Pub/Sub Adapter
-    participant SocketB as Socket.IO Client B
-    participant MonacoB as Monaco Editor B
-    actor Bob as Bob (Client B)
+$$\text{State}(A) \oplus \Delta B = \text{State}(B) \oplus \Delta A$$
 
-    Alice->>MonacoA: Types code edit
-    MonacoA->>SocketA: Yjs document update event
-    SocketA->>SocketServer: emit('editor:sync_update', { roomId, update })
-    SocketServer->>RedisPubSub: PUBLISH room:channel update
-    RedisPubSub->>SocketServer: Broadcast to room subscribers
-    SocketServer->>SocketB: emit('editor:sync_update', update)
-    SocketB->>MonacoB: Yjs.applyUpdate(doc, update)
-    MonacoB-->>Bob: Real-time visual change rendered
-```
+- **Client Editing**: Keypresses in Monaco Editor dispatch binary delta packets (`Uint8Array`) over WebSocket.
+- **Server Multiplexing**: The Socket.IO server distributes the update to Redis Pub/Sub channels scoped by `room:{roomId}:editor`.
+- **Conflict Resolution**: Concurrently arriving edits converge deterministically across all peers without server-side locking.
 
-### 3.2 WebRTC Voice Signaling & Audio Mesh Architecture
-Voice rooms in OwlSync establish a distributed peer-to-peer mesh coordinated through Socket.IO signaling:
+### 3.2 WebRTC Peer-to-Peer Voice Mesh Signaling
+Voice channels operate over peer-to-peer WebRTC mesh topology coordinated via Socket.IO:
 
 ```mermaid
-sequenceDiagram
-    autonumber
-    actor PeerA as User 1 (Alice)
-    participant SocketA as Alice Socket
-    participant SocketServer as Socket.IO Gateway
-    participant SocketB as Bob Socket
-    actor PeerB as User 2 (Bob)
+flowchart TB
+    subgraph WebClient ["OwlSync Web Client"]
+        VM["VoiceManager (RTCPeerConnection Matrix)"]
+        HVC["Header Voice Controls (Mute / Speaking Indicator)"]
+        SR["SessionRecorder (WebM Audio/Screen Capture)"]
+        TL["Timeline & Code Authorship Inspector"]
+    end
 
-    PeerA->>SocketA: join_voice_room(roomId)
-    SocketA->>SocketServer: emit('voice:join', { roomId })
-    SocketServer->>SocketB: emit('voice:user_joined', { userId: Alice })
-    PeerB->>SocketB: createOffer(SDP)
-    SocketB->>SocketServer: emit('voice:signal', { target: Alice, sdpOffer })
-    SocketServer->>SocketA: emit('voice:signal', { sender: Bob, sdpOffer })
-    PeerA->>SocketA: setRemoteDescription & createAnswer(SDP)
-    SocketA->>SocketServer: emit('voice:signal', { target: Bob, sdpAnswer })
-    SocketServer->>SocketB: emit('voice:signal', { sender: Alice, sdpAnswer })
-    Note over PeerA,PeerB: Direct WebRTC P2P Audio Stream Established
+    subgraph SocketServer ["OwlSync Socket.IO Gateway"]
+        VH["voice.handlers.js (SDP Offer/Answer & ICE Relays)"]
+        AH["activity.handlers.js (Authorship & Presence Broadcast)"]
+        RH["room.handlers.js (Role Enforcement & Kick Drop-Guards)"]
+    end
+
+    HVC -->|Toggle Mic| VM
+    HVC -->|Trigger Rec| SR
+    VM <-->|Signaling: offer / answer / ice| VH
+    TL <-->|Activity & Authorship Broadcast| AH
+    TL -->|Enforce Viewer / Editor Lock| RH
 ```
 
 ---
 
-## 4. Asynchronous Background Task Pipelines
+## 4. Asynchronous Task Queue Architecture (RabbitMQ)
 
-All intensive operations run out-of-band via RabbitMQ queues to preserve maximum throughput on the main HTTP event loop:
+To ensure sub-5ms HTTP API latency, all CPU-bound, disk-intensive, and network I/O operations are offloaded to **RabbitMQ** durable queues:
 
-| Queue Name | Producer | Consumer Worker | Responsibility |
+| Queue Name | Producers | Consumers | Payload Specifications |
 |:---|:---|:---|:---|
-| `email_queue` | REST API | Email Worker | Handles welcome emails, password reset links, magic login tokens. |
-| `thumbnail_queue` | API / Sockets | Thumbnail Worker | Generates lightweight preview thumbnails for recordings. |
-| `compression_queue` | Project Service | Compression Worker | Asynchronously creates `.zip` archives of full project codebases. |
-| `analytics_queue` | Sockets / API | Analytics Worker | Aggregates room duration, typing velocity, and activity counters into Redis. |
+| `email_queue` | REST API | Email Worker | `{ to: string, subject: string, text: string, html?: string }` |
+| `thumbnail_queue` | REST API / Sockets | Media Worker | `{ recordingId: string, videoPath: string, outputPath: string }` |
+| `compression_queue` | Project Service | Compression Worker | `{ projectId: string, exportFileName: string }` |
+| `analytics_queue` | Sockets / API | Analytics Worker | `{ userId: string, roomId: string, eventType: string, timestamp: string }` |
 
 ```mermaid
-flowchart LR
-    API[REST API Server] -->|Publish payload| RMQ[RabbitMQ Exchange]
-    RMQ -->|Route| Q1[(email_queue)]
-    RMQ -->|Route| Q2[(thumbnail_queue)]
-    RMQ -->|Route| Q3[(compression_queue)]
-    RMQ -->|Route| Q4[(analytics_queue)]
+sequenceDiagram
+    autonumber
+    participant Client as Client Application
+    participant API as REST API Server
+    participant RMQ as RabbitMQ Exchange
+    participant Worker as Compression Worker
+    participant Storage as File Storage Disk
 
-    Q1 --> W1[Email Worker]
-    Q2 --> W2[Thumbnail Worker]
-    Q3 --> W3[Compression Worker]
-    Q4 --> W4[Analytics Worker]
+    Client->>API: POST /api/projects/:id/export
+    API->>RMQ: publishToQueue('compression_queue', { projectId, exportId })
+    API-->>Client: 202 Accepted { status: 'QUEUED' }
 
-    W1 --> Ext1[SMTP / Resend Provider]
-    W2 --> Ext2[Storage / Thumbnail Dir]
-    W3 --> Ext3[Storage / Export ZIP Dir]
-    W4 --> Ext4[Redis Analytics Hashes]
+    RMQ->>Worker: Consume compression task
+    Worker->>Storage: Read project files and generate archive .zip
+    Worker->>RMQ: ACK channel message
+    Client->>API: GET /api/projects/:id/export (Downloads generated archive)
 ```
 
 ---
 
-## 5. Relational Database Schema & Domain Model
+## 5. Security Architecture & Concurrency Guarantees
 
-The PostgreSQL database (managed via Prisma ORM) enforces strict referential integrity, cascading cleanup rules, and relational indices:
+### 5.1 Redlock Distributed Locking
+To prevent concurrent race conditions across horizontal microservices:
+1. **Acquisition**: Atomic `SET lock:{resourceKey} {uniqueToken} NX PX {ttl}`.
+2. **Execution**: Safe critical section protected with configurable spin-wait timeout (default: 3000ms).
+3. **Atomic Lua Release**:
+   ```lua
+   if redis.call("get", KEYS[1]) == ARGV[1] then
+     return redis.call("del", KEYS[1])
+   else
+     return 0
+   end
+   ```
 
-### Domain Entities Hierarchy
-- **Users**: Account credentials, profiles, 2FA configurations, active sessions, badges, and audit trails.
-- **Teams & TeamMembers**: Shared organizations with granular roles (`OWNER`, `ADMIN`, `MEMBER`).
-- **Projects**: Persistent codebases containing `ProjectFile`, `Note`, `Whiteboard`, and `Activity` history.
-- **Rooms & RoomMembers**: Real-time collaborative sessions linked to projects with role-based write permissions (`OWNER`, `MEMBER`, `GUEST`).
-- **Friendships & FriendRequests**: Bidirectional social graph with real-time online presence.
-- **Notifications**: Persistent in-app activity notifications with deep jump links.
-- **Badges & UserBadges**: Milestone-based achievement awards and profile gamification.
-
----
-
-## 6. Security, Reliability & Concurrency
-
-1. **Distributed Locks (Redlock Algorithm)**:
-   - Atomic concurrency locking via Redis `SET NX PX`.
-   - Safe release scripts executed via atomic Redis Lua scripts to eliminate race conditions on room creation, joining, and file mutation.
-2. **Role-Based Access Control (RBAC)**:
-   - Room hosts can change member permissions to `VIEWER` (read-only Monaco editor lock) or kick unauthorized participants.
-   - Sockets enforce drop-guards preventing viewer updates from propagating to the collaborative Yjs document.
-3. **Session & Security Defense**:
-   - HTTP-only encrypted cookies with JWT refresh token rotation.
-   - Cross-Site Scripting (XSS) sanitation on Markdown and Code outputs.
-   - Helmet HTTP headers (`Content-Security-Policy`, `X-Content-Type-Options`, `Cross-Origin-Resource-Policy`).
+### 5.2 Role-Based Access Control (RBAC) & Drop-Guards
+- **Host / Owner**: Full control over room lifecycle, permissions, and member expulsion.
+- **Member (Editor)**: Read-write access to Monaco IDE, whiteboards, and terminal execution.
+- **Guest (Viewer)**: Read-only access enforced by UI locking and server-side socket drop-guards.
 
 ---
 
-## 7. Observability & Operational Metrics
+## 6. Observability, Metrics & Telemetry
 
-- **Prometheus Metrics**: Custom registry exporting active rooms, active WebSocket connections, HTTP latency histograms, and memory footprint on `/metrics`.
-- **Grafana Dashboards**: Real-time visualization provisioning for application throughput, connection status, and error rate monitoring.
-- **OpenAPI Interactive Documentation**: Complete Swagger UI documentation live at `/api-docs` and `/docs`.
+OwlSync integrates native metrics collection through Prometheus and Grafana:
+
+- **Metrics Scrape Endpoint**: `/metrics` (Prometheus exposition format).
+- **Tracked Telemetry**:
+  - `http_request_duration_seconds` (HTTP latency histogram).
+  - `active_websocket_connections_total` (Real-time gauge).
+  - `active_rooms_gauge` (Active collaborative session count).
+  - `rabbitmq_queue_depth` (Backpressure monitoring).
+- **Interactive OpenAPI Documentation**: Swagger UI live at `/api-docs` and `/docs`.
