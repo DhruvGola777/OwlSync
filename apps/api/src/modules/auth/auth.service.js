@@ -178,14 +178,29 @@ export const getUserSessions = async (userId) => {
   });
 };
 
-// --- Email Service (Ethereal for dev) ---
-let etherealTransporter;
+// --- Email Service (SMTP / Ethereal) ---
+let emailTransporter;
 
 const getTransporter = async () => {
-  if (etherealTransporter) return etherealTransporter;
-  let testAccount = await nodemailer.createTestAccount();
-  etherealTransporter = nodemailer.createTransport({
-    host: "smtp.ethereal.email",
+  if (emailTransporter) return emailTransporter;
+
+  if (env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS) {
+    emailTransporter = nodemailer.createTransport({
+      host: env.SMTP_HOST,
+      port: env.SMTP_PORT,
+      secure: env.SMTP_PORT === 465,
+      auth: {
+        user: env.SMTP_USER,
+        pass: env.SMTP_PASS,
+      },
+    });
+    return emailTransporter;
+  }
+
+  // Fallback to ethereal mock test inbox in development
+  const testAccount = await nodemailer.createTestAccount();
+  emailTransporter = nodemailer.createTransport({
+    host: 'smtp.ethereal.email',
     port: 587,
     secure: false,
     auth: {
@@ -193,19 +208,26 @@ const getTransporter = async () => {
       pass: testAccount.pass,
     },
   });
-  return etherealTransporter;
+  return emailTransporter;
 };
 
 export const sendEmail = async (to, subject, html) => {
-  const transporter = await getTransporter();
-  const info = await transporter.sendMail({
-    from: '"OwlSync Auth" <auth@owlsync.com>',
-    to,
-    subject,
-    html,
-  });
-  console.log(`\n📧 Email sent to ${to}: ${subject}`);
-  console.log(`🔗 Preview URL: ${nodemailer.getTestMessageUrl(info)}\n`);
+  try {
+    const transporter = await getTransporter();
+    const info = await transporter.sendMail({
+      from: env.SMTP_FROM || '"OwlSync" <auth@owlsync.com>',
+      to,
+      subject,
+      html,
+    });
+    console.log(`\n📧 Email sent to ${to}: ${subject}`);
+    const previewUrl = nodemailer.getTestMessageUrl(info);
+    if (previewUrl) {
+      console.log(`🔗 Ethereal Preview URL: ${previewUrl}\n`);
+    }
+  } catch (err) {
+    console.error(`⚠️ Failed to send email to ${to}:`, err.message);
+  }
 };
 
 // --- Verification Tokens (Magic Link & Password Reset) ---

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../../services/api';
 import { useNavigate } from 'react-router-dom';
-import { Code2, Plus, Loader2, Search, FolderUp } from 'lucide-react';
+import { Code2, Plus, Loader2, Search, FolderUp, HardDrive } from 'lucide-react';
 import { ImportProjectModal } from '../components/ImportProjectModal';
 
 export const ProjectsPage = () => {
@@ -10,6 +10,7 @@ export const ProjectsPage = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   
+  const isDesktop = typeof window !== 'undefined' && Boolean(window.electronAPI?.isDesktop);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -19,6 +20,39 @@ export const ProjectsPage = () => {
   useEffect(() => {
     fetchProjects();
   }, []);
+
+  const handleOpenLocalFolder = async () => {
+    if (!window.electronAPI?.openLocalFolder) return;
+    try {
+      const result = await window.electronAPI.openLocalFolder();
+      if (!result) return;
+      
+      setIsSubmitting(true);
+      const newProject = await api.createProject({
+        name: result.folderName,
+        description: `Local project from ${result.folderPath}`
+      });
+
+      for (const item of result.files) {
+        if (item.type === 'file') {
+          const content = await window.electronAPI.readLocalFile(item.fullPath);
+          await api.createFile(newProject.id, {
+            name: item.name,
+            path: item.path,
+            content: content || ''
+          });
+        }
+      }
+
+      setProjects([newProject, ...projects]);
+      navigate(`/project/${newProject.id}`);
+    } catch (err) {
+      console.error('Failed to open local folder:', err);
+      alert('Failed to import local folder: ' + err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const fetchProjects = async () => {
     try {
@@ -85,6 +119,16 @@ export const ProjectsPage = () => {
               className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-64"
             />
           </div>
+          {isDesktop && (
+            <button
+              onClick={handleOpenLocalFolder}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 rounded-lg transition font-medium shadow-sm"
+              title="Select and open an existing folder from your PC"
+            >
+              <HardDrive size={18} className="text-indigo-600" />
+              Open Local Folder
+            </button>
+          )}
           <button
             onClick={() => setShowImportModal(true)}
             className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg transition font-medium shadow-sm"

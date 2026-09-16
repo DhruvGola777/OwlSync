@@ -38,6 +38,13 @@ const DEFAULT_BADGES = [
     description: 'High velocity developer with active file edits.',
     icon: '⚡',
     category: 'PRODUCTIVITY'
+  },
+  {
+    slug: 'github-pioneer',
+    name: 'GitHub Pioneer',
+    description: 'Authenticated via GitHub & linked open-source repositories.',
+    icon: '🐙',
+    category: 'OPEN_SOURCE'
   }
 ];
 

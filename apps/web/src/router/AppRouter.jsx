@@ -14,12 +14,14 @@ import { ProtectedRoute } from './ProtectedRoute';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import PublicProfile from '../features/users/pages/PublicProfile';
 import { TeamsPage } from '../features/teams/pages/TeamsPage';
+import { DownloadPage } from '../features/landing/pages/DownloadPage';
 
 export const AppRouter = () => {
   return (
     <Routes>
       {/* Public / Auth Routes */}
       <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/download" element={<DownloadPage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />

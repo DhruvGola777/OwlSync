@@ -5,6 +5,7 @@ import AvatarDisplay from '../ui/AvatarDisplay';
 import { FriendsMenu } from './FriendsMenu';
 import { NotificationsMenu } from './NotificationsMenu';
 import { CommandPalette } from '../ui/CommandPalette';
+import { WindowControls } from './WindowControls';
 import { useNavigate } from 'react-router-dom';
 
 export const Topbar = ({ isSidebarOpen, setIsSidebarOpen }) => {
@@ -69,6 +70,9 @@ export const Topbar = ({ isSidebarOpen, setIsSidebarOpen }) => {
                 </span>
               </div>
             </div>
+
+            {/* Desktop Window Titlebar Controls */}
+            <WindowControls />
           </div>
         </div>
       </header>

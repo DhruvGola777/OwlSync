@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="owlGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1" />
+      <stop offset="50%" stop-color="#4f46e5" />
+      <stop offset="100%" stop-color="#312e81" />
+    </linearGradient>
+    <linearGradient id="eyeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background Rounded Shield / Tile -->
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="url(#owlGradient)" filter="url(#glow)" />
+  <rect x="24" y="24" width="464" height="464" rx="100" fill="#0f172a" opacity="0.85" />
+  
+  <!-- Outer Ears / Brow Shape -->
+  <path d="M120 180 L180 120 L256 160 L332 120 L392 180 L370 340 C350 420 290 440 256 440 C222 440 162 420 142 340 Z" 
+        fill="url(#owlGradient)" opacity="0.3" />
+
+  <!-- Code Brackets Overlay < / > -->
+  <path d="M100 256 L150 200 M100 256 L150 312" stroke="#6366f1" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M412 256 L362 200 M412 256 L362 312" stroke="#6366f1" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Left Eye -->
+  <circle cx="196" cy="240" r="54" fill="#1e293b" stroke="#6366f1" stroke-width="12" />
+  <circle cx="196" cy="240" r="32" fill="url(#eyeGradient)" />
+  <circle cx="206" cy="230" r="10" fill="#ffffff" />
+
+  <!-- Right Eye -->
+  <circle cx="316" cy="240" r="54" fill="#1e293b" stroke="#6366f1" stroke-width="12" />
+  <circle cx="316" cy="240" r="32" fill="url(#eyeGradient)" />
+  <circle cx="326" cy="230" r="10" fill="#ffffff" />
+
+  <!-- Beak -->
+  <polygon points="256,270 236,320 276,320" fill="#f59e0b" />
+
+  <!-- Terminal Sync Pulse Dot -->
+  <circle cx="256" cy="380" r="12" fill="#10b981" />
+  <circle cx="256" cy="380" r="22" stroke="#10b981" stroke-width="4" opacity="0.5" />
+</svg>

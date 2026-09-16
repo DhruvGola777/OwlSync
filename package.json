@@ -9,6 +9,8 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
+    "desktop:dev": "npm --prefix apps/desktop run dev",
+    "desktop:build": "npm --prefix apps/web run build && npm --prefix apps/desktop run build:win",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{js,jsx,json,md}\""
   },

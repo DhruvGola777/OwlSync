@@ -20,4 +20,9 @@ export const env = {
   RABBITMQ_URL: process.env.RABBITMQ_URL || 'amqp://127.0.0.1:5672',
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  SMTP_HOST: process.env.SMTP_HOST,
+  SMTP_PORT: process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587,
+  SMTP_USER: process.env.SMTP_USER,
+  SMTP_PASS: process.env.SMTP_PASS,
+  SMTP_FROM: process.env.SMTP_FROM || '"OwlSync" <noreply@owlsync.com>',
 };

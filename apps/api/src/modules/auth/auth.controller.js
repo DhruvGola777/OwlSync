@@ -19,6 +19,7 @@ import {
   verifyUserEmail
 } from './auth.service.js';
 import { verifyTwoFactorToken } from '../users/users.service.js';
+import { awardBadge } from '../badges/badges.service.js';
 
 const ACCESS_TOKEN_COOKIE = 'token';
 const REFRESH_TOKEN_COOKIE = 'refreshToken';
@@ -386,6 +387,10 @@ export const oauthCallback = async (req, res, next) => {
       avatarUrl: profile.avatarUrl
     });
     
+    if (provider === 'github') {
+      awardBadge(user.id, 'github-pioneer').catch(console.error);
+    }
+
     if (isNewUser) {
       const welcomeHtml = getOAuthWelcomeEmailHtml(profile.name, provider);
       sendEmail(profile.email, 'Welcome to OwlSync!', welcomeHtml).catch(console.error);

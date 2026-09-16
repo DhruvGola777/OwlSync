@@ -26,6 +26,7 @@ import { useVoiceRoom } from '../hooks/useVoiceRoom';
 import { useSessionRecorder } from '../hooks/useSessionRecorder';
 import { Sparkles, Film, StopCircle, BarChart3 } from 'lucide-react';
 import { AnalyticsModal } from '../../analytics/components/AnalyticsModal';
+import { WindowControls } from '../../../components/layout/WindowControls';
 
 export const RoomView = () => {
   const { id } = useParams();
@@ -558,7 +559,7 @@ export const RoomView = () => {
         {/* Left Section: Logo & Menus */}
         <div className="flex items-center space-x-3 min-w-0 shrink-0">
           <div className="flex items-center space-x-2 shrink-0">
-            <span className="text-lg">🦉</span>
+            <img src="/logo.png" alt="OwlSync" className="w-5 h-5 rounded-md object-cover shadow-sm" />
             <span className="font-bold text-sm text-white tracking-tight hidden sm:inline">OwlSync</span>
           </div>
 
@@ -798,6 +799,9 @@ export const RoomView = () => {
               </button>
             </>
           )}
+
+          {/* Desktop Window Titlebar Controls (Minimize / Maximize / Close) */}
+          <WindowControls />
         </div>
       </div>
 
