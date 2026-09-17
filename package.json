@@ -9,6 +9,7 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
+    "prisma:generate": "npx prisma generate --schema=./packages/database/prisma/schema.prisma",
     "start:api": "node apps/api/src/server.js",
     "desktop:dev": "npm --prefix apps/desktop run dev",
     "desktop:build": "npm --prefix apps/web run build && npm --prefix apps/desktop run build:win",
