@@ -17,10 +17,12 @@ import { TeamsPage } from '../features/teams/pages/TeamsPage';
 import { DownloadPage } from '../features/landing/pages/DownloadPage';
 
 export const AppRouter = () => {
+  const isDesktop = typeof window !== 'undefined' && !!window.electronAPI;
+
   return (
     <Routes>
       {/* Public / Auth Routes */}
-      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/" element={isDesktop ? <Navigate to="/login" replace /> : <DownloadPage />} />
       <Route path="/download" element={<DownloadPage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
