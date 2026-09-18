@@ -279,17 +279,22 @@ export const resetPassword = async (req, res, next) => {
   }
 };
 
+const getOAuthRedirectUri = (provider) => {
+  const base = (env.API_BASE_URL || 'http://localhost:4000').replace(/\/+$/, '');
+  return `${base}/api/auth/oauth/${provider}/callback`;
+};
+
 // OAuth redirect and callback
 export const oauthRedirect = (req, res, next) => {
   try {
     const { provider } = req.params;
     
     if (provider === 'google') {
-      const redirectUri = `${env.API_BASE_URL}/api/auth/oauth/google/callback`;
+      const redirectUri = getOAuthRedirectUri('google');
       const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=profile%20email`;
       return res.redirect(url);
     } else if (provider === 'github') {
-      const redirectUri = `${env.API_BASE_URL}/api/auth/oauth/github/callback`;
+      const redirectUri = getOAuthRedirectUri('github');
       const url = `https://github.com/login/oauth/authorize?client_id=${env.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:email`;
       return res.redirect(url);
     }
@@ -318,7 +323,7 @@ export const oauthCallback = async (req, res, next) => {
           client_id: env.GOOGLE_CLIENT_ID,
           client_secret: env.GOOGLE_CLIENT_SECRET,
           code,
-          redirect_uri: `${env.API_BASE_URL}/api/auth/oauth/google/callback`,
+          redirect_uri: getOAuthRedirectUri('google'),
           grant_type: 'authorization_code'
         })
       });
@@ -350,7 +355,7 @@ export const oauthCallback = async (req, res, next) => {
           client_id: env.GITHUB_CLIENT_ID,
           client_secret: env.GITHUB_CLIENT_SECRET,
           code,
-          redirect_uri: `${env.API_BASE_URL}/api/auth/oauth/github/callback`,
+          redirect_uri: getOAuthRedirectUri('github'),
         })
       });
       const tokenData = await tokenRes.json();
