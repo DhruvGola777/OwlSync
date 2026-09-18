@@ -320,17 +320,19 @@ export const oauthCallback = async (req, res, next) => {
 
     if (provider === 'google') {
       const redirectUri = getOAuthRedirectUri('google');
-      // 1. Exchange code for access token
+      // 1. Exchange code for access token (Google requires x-www-form-urlencoded)
+      const tokenParams = new URLSearchParams({
+        client_id: env.GOOGLE_CLIENT_ID,
+        client_secret: env.GOOGLE_CLIENT_SECRET,
+        code: String(code),
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code'
+      });
+
       const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client_id: env.GOOGLE_CLIENT_ID,
-          client_secret: env.GOOGLE_CLIENT_SECRET,
-          code,
-          redirect_uri: redirectUri,
-          grant_type: 'authorization_code'
-        })
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: tokenParams.toString()
       });
       const tokenData = await tokenRes.json();
       if (!tokenData.access_token) {
