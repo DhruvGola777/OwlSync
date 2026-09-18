@@ -37,17 +37,9 @@ export const errorHandler = (err, req, res, next) => {
     });
   }
 
-  if (err.isOperational) {
-    // Operational, trusted error: send message to client
-    return res.status(err.statusCode).json({
-      status: err.status,
-      message: err.message
-    });
-  }
-  
-  // Programming or other unknown error: don't leak error details
-  res.status(500).json({
-    status: 'error',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went very wrong!'
+  // Return operational or general error with descriptive message
+  res.status(err.statusCode || 500).json({
+    status: err.status || 'error',
+    message: err.message || 'Internal Server Error',
   });
 };
