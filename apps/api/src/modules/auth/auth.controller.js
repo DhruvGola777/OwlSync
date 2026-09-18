@@ -25,10 +25,12 @@ const ACCESS_TOKEN_COOKIE = 'token';
 const REFRESH_TOKEN_COOKIE = 'refreshToken';
 const SESSION_COOKIE_LIFETIME = 30 * 24 * 60 * 60 * 1000; // 30 days
 
+const isProduction = env.NODE_ENV === 'production';
+
 const cookieOptions = {
   httpOnly: true,
-  secure: env.NODE_ENV === 'production',
-  sameSite: 'lax',
+  secure: isProduction,
+  sameSite: isProduction ? 'none' : 'lax',
   path: '/',
 };
 
@@ -310,11 +312,14 @@ export const oauthCallback = async (req, res, next) => {
     const { provider } = req.params;
     const { code } = req.query; 
     
-    if (!code) throw new AppError('Authorization code missing', 400);
+    if (!code) {
+      return res.redirect(`${env.CLIENT_URL}/login?error=Authorization+code+missing`);
+    }
 
     let profile = {};
 
     if (provider === 'google') {
+      const redirectUri = getOAuthRedirectUri('google');
       // 1. Exchange code for access token
       const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
@@ -323,12 +328,15 @@ export const oauthCallback = async (req, res, next) => {
           client_id: env.GOOGLE_CLIENT_ID,
           client_secret: env.GOOGLE_CLIENT_SECRET,
           code,
-          redirect_uri: getOAuthRedirectUri('google'),
+          redirect_uri: redirectUri,
           grant_type: 'authorization_code'
         })
       });
       const tokenData = await tokenRes.json();
-      if (!tokenData.access_token) throw new AppError('Failed to exchange Google token', 400);
+      if (!tokenData.access_token) {
+        console.error('Google token exchange error:', tokenData);
+        return res.redirect(`${env.CLIENT_URL}/login?error=${encodeURIComponent(tokenData.error_description || tokenData.error || 'Google token exchange failed')}`);
+      }
 
       // 2. Fetch user profile
       const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
@@ -344,6 +352,7 @@ export const oauthCallback = async (req, res, next) => {
       };
 
     } else if (provider === 'github') {
+      const redirectUri = getOAuthRedirectUri('github');
       // 1. Exchange code for access token
       const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
         method: 'POST',
@@ -355,11 +364,14 @@ export const oauthCallback = async (req, res, next) => {
           client_id: env.GITHUB_CLIENT_ID,
           client_secret: env.GITHUB_CLIENT_SECRET,
           code,
-          redirect_uri: getOAuthRedirectUri('github'),
+          redirect_uri: redirectUri,
         })
       });
       const tokenData = await tokenRes.json();
-      if (!tokenData.access_token) throw new AppError('Failed to exchange GitHub token', 400);
+      if (!tokenData.access_token) {
+        console.error('GitHub token exchange error:', tokenData);
+        return res.redirect(`${env.CLIENT_URL}/login?error=${encodeURIComponent(tokenData.error_description || tokenData.error || 'GitHub token exchange failed')}`);
+      }
 
       // 2. Fetch user profile
       const userRes = await fetch('https://api.github.com/user', {
@@ -378,7 +390,9 @@ export const oauthCallback = async (req, res, next) => {
         email = primaryEmail?.email;
       }
 
-      if (!email) throw new AppError('No email found for GitHub account', 400);
+      if (!email) {
+        return res.redirect(`${env.CLIENT_URL}/login?error=No+email+found+for+GitHub+account`);
+      }
 
       profile = {
         email: email,
@@ -387,7 +401,7 @@ export const oauthCallback = async (req, res, next) => {
         avatarUrl: userData.avatar_url
       };
     } else {
-      throw new AppError('Unsupported provider', 400);
+      return res.redirect(`${env.CLIENT_URL}/login?error=Unsupported+OAuth+provider`);
     }
 
     const { user, isNewUser } = await findOrCreateOAuthUser({ 
@@ -416,6 +430,7 @@ export const oauthCallback = async (req, res, next) => {
     setAuthCookies(res, session.accessToken, session.refreshToken);
     res.redirect(`${env.CLIENT_URL}/projects`);
   } catch (err) {
-    next(err);
+    console.error('OAuth callback unhandled error:', err);
+    res.redirect(`${env.CLIENT_URL}/login?error=${encodeURIComponent(err.message || 'Authentication error')}`);
   }
 };
