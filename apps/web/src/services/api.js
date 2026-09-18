@@ -8,6 +8,19 @@ const apiClient = axios.create({
   withCredentials: true,
 });
 
+// Request interceptor: attach Authorization header if JWT token is stored in localStorage
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('owlsync_token');
+    if (token) {
+      config.headers = config.headers || {};
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 // Interceptor to handle silent token refresh on 401
 apiClient.interceptors.response.use(
   (response) => response,
@@ -17,11 +30,21 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry && originalRequest.url !== '/auth/login' && originalRequest.url !== '/auth/refresh') {
       originalRequest._retry = true;
       try {
-        await apiClient.post('/auth/refresh');
+        const storedRefreshToken = localStorage.getItem('owlsync_refresh_token');
+        const res = await apiClient.post('/auth/refresh', { refreshToken: storedRefreshToken });
+        if (res.data?.token) {
+          localStorage.setItem('owlsync_token', res.data.token);
+          if (res.data?.refreshToken) {
+            localStorage.setItem('owlsync_refresh_token', res.data.refreshToken);
+          }
+          originalRequest.headers.Authorization = `Bearer ${res.data.token}`;
+        }
         return apiClient(originalRequest);
       } catch (refreshError) {
+        localStorage.removeItem('owlsync_token');
+        localStorage.removeItem('owlsync_refresh_token');
         // If refresh fails, they really are logged out
-        if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+        if (window.location.pathname !== '/login' && window.location.pathname !== '/register' && window.location.pathname !== '/' && window.location.pathname !== '/download') {
           window.location.href = '/login';
         }
         return Promise.reject(refreshError);
@@ -600,11 +623,17 @@ export const api = {
     onComplete
   }) {
     try {
+      const token = localStorage.getItem('owlsync_token');
+      const headers = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch(`${API_URL}/ai/agent/stream`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers,
         credentials: 'include',
         body: JSON.stringify({
           projectId,

@@ -7,7 +7,11 @@ const JWT_SECRET = env.JWT_SECRET;
 
 export const requireAuth = async (req, res, next) => {
   try {
-    const token = req.cookies.token;
+    let token = req.cookies?.token;
+
+    if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
 
     if (!token) {
       throw new AppError('You are not logged in. Please log in to get access.', 401);

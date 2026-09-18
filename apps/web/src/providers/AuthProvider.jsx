@@ -9,6 +9,24 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuth = async () => {
     try {
+      // Check if redirected from OAuth with tokens in query params
+      const params = new URLSearchParams(window.location.search);
+      const urlToken = params.get('token');
+      const urlRefreshToken = params.get('refreshToken');
+
+      if (urlToken) {
+        localStorage.setItem('owlsync_token', urlToken);
+        if (urlRefreshToken) {
+          localStorage.setItem('owlsync_refresh_token', urlRefreshToken);
+        }
+        // Remove token query parameters from URL cleanly without page reload
+        params.delete('token');
+        params.delete('refreshToken');
+        const remainingQuery = params.toString() ? `?${params.toString()}` : '';
+        const cleanUrl = `${window.location.pathname}${remainingQuery}${window.location.hash}`;
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
+
       const data = await api.getMe();
       setUser(data.user);
     } catch (err) {
@@ -24,6 +42,12 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     const data = await api.login(email, password);
+    if (data.token) {
+      localStorage.setItem('owlsync_token', data.token);
+    }
+    if (data.refreshToken) {
+      localStorage.setItem('owlsync_refresh_token', data.refreshToken);
+    }
     if (data.user) {
       setUser(data.user);
     }
@@ -32,6 +56,12 @@ export const AuthProvider = ({ children }) => {
 
   const loginTwoFactor = async (email, token) => {
     const data = await api.loginTwoFactor(email, token);
+    if (data.token) {
+      localStorage.setItem('owlsync_token', data.token);
+    }
+    if (data.refreshToken) {
+      localStorage.setItem('owlsync_refresh_token', data.refreshToken);
+    }
     if (data.user) {
       setUser(data.user);
     }
@@ -50,6 +80,8 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       console.error(err);
     }
+    localStorage.removeItem('owlsync_token');
+    localStorage.removeItem('owlsync_refresh_token');
     await api.logout();
     setUser(null);
   };

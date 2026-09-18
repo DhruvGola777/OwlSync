@@ -25,26 +25,53 @@ export const DownloadPage = () => {
 
   const handleDownload = (platform, format = 'installer') => {
     setDownloading(true);
-    const fileName = platform === 'windows' 
-      ? 'OwlSync-Setup-1.0.0.exe' 
-      : platform === 'mac' 
-      ? 'OwlSync-1.0.0-arm64.dmg' 
-      : 'OwlSync-1.0.0.AppImage';
+    let fileName = 'OwlSync-Setup-1.0.0.exe';
+    let downloadUrl = 'https://github.com/DhruvGola777/OwlSync/releases/download/v1.0.0/OwlSync-Setup-1.0.0.exe';
 
-    setDownloadMessage(`Preparing ${fileName}... Your download will begin in a moment.`);
+    if (platform === 'windows') {
+      if (format === 'portable') {
+        fileName = 'OwlSync-Windows-Portable.zip';
+        downloadUrl = 'https://github.com/DhruvGola777/OwlSync/releases/download/v1.0.0/OwlSync-Windows-Portable.zip';
+      } else {
+        fileName = 'OwlSync-Setup-1.0.0.exe';
+        downloadUrl = 'https://github.com/DhruvGola777/OwlSync/releases/download/v1.0.0/OwlSync-Setup-1.0.0.exe';
+      }
+    } else if (platform === 'mac') {
+      if (format === 'intel') {
+        fileName = 'OwlSync-1.0.0-x64.dmg';
+        downloadUrl = 'https://github.com/DhruvGola777/OwlSync/releases/download/v1.0.0/OwlSync-1.0.0-x64.dmg';
+      } else {
+        fileName = 'OwlSync-1.0.0-arm64.dmg';
+        downloadUrl = 'https://github.com/DhruvGola777/OwlSync/releases/download/v1.0.0/OwlSync-1.0.0-arm64.dmg';
+      }
+    } else if (platform === 'linux') {
+      if (format === 'deb') {
+        fileName = 'owlsync_1.0.0_amd64.deb';
+        downloadUrl = 'https://github.com/DhruvGola777/OwlSync/releases/download/v1.0.0/owlsync_1.0.0_amd64.deb';
+      } else {
+        fileName = 'OwlSync-1.0.0.AppImage';
+        downloadUrl = 'https://github.com/DhruvGola777/OwlSync/releases/download/v1.0.0/OwlSync-1.0.0.AppImage';
+      }
+    }
+
+    setDownloadMessage(`Downloading ${fileName}...`);
+
+    // Trigger real download link via anchor tag
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.setAttribute('download', fileName);
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
 
     setTimeout(() => {
-      // Create a mock trigger / real download link
-      const link = document.createElement('a');
-      link.href = `#`; // in production, links to /releases/OwlSync-Setup-1.0.0.exe or GitHub Release Asset
-      link.setAttribute('download', fileName);
-      document.body.appendChild(link);
-      // alert or notification
-      setDownloadMessage(`✅ ${fileName} is downloading! Check your browser downloads.`);
+      setDownloadMessage(`✅ ${fileName} download started! Check your downloads.`);
       setTimeout(() => {
         setDownloading(false);
-      }, 3000);
-    }, 1200);
+      }, 3500);
+    }, 800);
   };
 
   const getPrimaryLabel = () => {
@@ -133,9 +160,19 @@ export const DownloadPage = () => {
               </div>
             )}
 
-            <span className="text-xs text-slate-500">
-              Free & Open Source under MIT License • SHA-256 Verified
-            </span>
+            <div className="flex flex-col sm:flex-row items-center gap-3 text-xs text-slate-500">
+              <span>Free & Open Source under MIT License • SHA-256 Verified</span>
+              <span className="hidden sm:inline">•</span>
+              <a 
+                href="https://github.com/DhruvGola777/OwlSync/releases" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-indigo-400 hover:text-indigo-300 inline-flex items-center gap-1 transition"
+              >
+                <span>All releases on GitHub</span>
+                <ExternalLink size={12} />
+              </a>
+            </div>
           </div>
         </div>
       </section>

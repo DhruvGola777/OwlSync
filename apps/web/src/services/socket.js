@@ -12,8 +12,11 @@ class SocketService {
       return this.socket;
     }
 
+    const token = typeof window !== 'undefined' ? localStorage.getItem('owlsync_token') : null;
+
     this.socket = io(SOCKET_URL, {
       withCredentials: true,
+      auth: { token },
       autoConnect: true,
       reconnection: true,
     });

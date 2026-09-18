@@ -110,6 +110,8 @@ export const login = async (req, res, next) => {
 
     res.status(200).json({
       message: 'Login successful',
+      token: session.accessToken,
+      refreshToken: session.refreshToken,
       user: userResponsePayload(user),
     });
   } catch (err) {
@@ -119,7 +121,7 @@ export const login = async (req, res, next) => {
 
 export const refreshSession = async (req, res, next) => {
   try {
-    const refreshToken = req.cookies[REFRESH_TOKEN_COOKIE];
+    const refreshToken = req.cookies[REFRESH_TOKEN_COOKIE] || req.body?.refreshToken;
     if (!refreshToken) throw new AppError('Refresh token missing', 401);
 
     const session = await findSessionByRefreshToken(refreshToken);
@@ -139,6 +141,8 @@ export const refreshSession = async (req, res, next) => {
 
     res.status(200).json({
       message: 'Session refreshed',
+      token: rotated.accessToken,
+      refreshToken: rotated.refreshToken,
       user: userResponsePayload(session.user),
     });
   } catch (err) {
@@ -148,7 +152,7 @@ export const refreshSession = async (req, res, next) => {
 
 export const logout = async (req, res, next) => {
   try {
-    const refreshToken = req.cookies[REFRESH_TOKEN_COOKIE];
+    const refreshToken = req.cookies[REFRESH_TOKEN_COOKIE] || req.body?.refreshToken;
     if (refreshToken) await revokeSessionByToken(refreshToken);
 
     clearAuthCookies(res);
@@ -196,7 +200,12 @@ export const loginTwoFactor = async (req, res, next) => {
       ipAddress: req.ip,
     });
     setAuthCookies(res, session.accessToken, session.refreshToken);
-    res.status(200).json({ message: 'Login successful', user: userResponsePayload(user) });
+    res.status(200).json({ 
+      message: 'Login successful', 
+      token: session.accessToken, 
+      refreshToken: session.refreshToken, 
+      user: userResponsePayload(user) 
+    });
   } catch (err) {
     next(err);
   }
@@ -436,7 +445,7 @@ export const oauthCallback = async (req, res, next) => {
 
     setAuthCookies(res, session.accessToken, session.refreshToken);
     const clientBase = (env.CLIENT_URL || 'http://localhost:5173').replace(/\/+$/, '');
-    res.redirect(`${clientBase}/projects`);
+    res.redirect(`${clientBase}/projects?token=${session.accessToken}&refreshToken=${session.refreshToken}`);
   } catch (err) {
     console.error('OAuth callback unhandled error:', err);
     const clientBase = (env.CLIENT_URL || 'http://localhost:5173').replace(/\/+$/, '');
