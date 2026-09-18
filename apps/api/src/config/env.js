@@ -25,4 +25,6 @@ export const env = {
   SMTP_USER: process.env.SMTP_USER,
   SMTP_PASS: process.env.SMTP_PASS,
   SMTP_FROM: process.env.SMTP_FROM || '"OwlSync" <noreply@owlsync.com>',
+  CLIENT_URL: process.env.CLIENT_URL || 'http://localhost:5173',
+  API_BASE_URL: process.env.API_BASE_URL || 'http://localhost:4000',
 };

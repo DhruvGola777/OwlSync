@@ -88,7 +88,10 @@ export const Register = () => {
             variant="outline" 
             className="w-full flex justify-center" 
             type="button"
-            onClick={() => window.location.href = 'http://localhost:4000/api/auth/oauth/google'}
+            onClick={() => {
+              const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+              window.location.href = `${apiBase}/auth/oauth/google`;
+            }}
           >
             Google
           </Button>
@@ -96,7 +99,10 @@ export const Register = () => {
             variant="outline" 
             className="w-full flex justify-center" 
             type="button"
-            onClick={() => window.location.href = 'http://localhost:4000/api/auth/oauth/github'}
+            onClick={() => {
+              const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+              window.location.href = `${apiBase}/auth/oauth/github`;
+            }}
           >
             GitHub
           </Button>

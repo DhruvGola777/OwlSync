@@ -6,6 +6,8 @@ import {
 import { api } from '../../../services/api';
 import { formatDistanceToNow } from 'date-fns';
 
+const API_ORIGIN = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api').replace(/\/api\/?$/, '');
+
 export const RecordingsPage = () => {
   const [recordings, setRecordings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -105,7 +107,7 @@ export const RecordingsPage = () => {
   };
 
   const handleCopyLink = (rec) => {
-    const fullUrl = `http://localhost:4000${rec.url}`;
+    const fullUrl = `${API_ORIGIN}${rec.url}`;
     navigator.clipboard.writeText(fullUrl);
     setCopiedId(rec.id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -218,8 +220,8 @@ export const RecordingsPage = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredRecordings.map((rec) => {
-            const videoUrl = `http://localhost:4000${rec.url}`;
-            const thumbUrl = rec.thumbnailUrl ? `http://localhost:4000${rec.thumbnailUrl}` : null;
+            const videoUrl = `${API_ORIGIN}${rec.url}`;
+            const thumbUrl = rec.thumbnailUrl ? `${API_ORIGIN}${rec.thumbnailUrl}` : null;
             const sizeMB = rec.size ? (rec.size / (1024 * 1024)).toFixed(1) : '0';
             const timeAgo = rec.createdAt ? formatDistanceToNow(new Date(rec.createdAt), { addSuffix: true }) : '';
 
@@ -413,7 +415,7 @@ export const RecordingsPage = () => {
             {/* Video Player Box */}
             <div className="bg-black aspect-video flex items-center justify-center overflow-hidden">
               <video
-                src={`http://localhost:4000${selectedRecording.url}`}
+                src={`${API_ORIGIN}${selectedRecording.url}`}
                 controls
                 autoPlay
                 playsInline
@@ -435,7 +437,7 @@ export const RecordingsPage = () => {
 
               <div className="flex items-center gap-2.5">
                 <a
-                  href={`http://localhost:4000${selectedRecording.url}`}
+                  href={`${API_ORIGIN}${selectedRecording.url}`}
                   download={`${selectedRecording.title.replace(/[^a-zA-Z0-9_-]/g, '_')}.webm`}
                   target="_blank"
                   rel="noreferrer"

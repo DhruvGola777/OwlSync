@@ -62,7 +62,7 @@ export const register = async (req, res, next) => {
     
     // Send a verification email instead of instant login
     const { token } = await generateVerificationToken(email, 'EMAIL_VERIFICATION');
-    const link = `http://localhost:4000/api/auth/verify-email?token=${token}`;
+    const link = `${env.API_BASE_URL}/api/auth/verify-email?token=${token}`;
     const welcomeHtml = getRegistrationEmailHtml(name, link);
     sendEmail(email, 'Verify your email - OwlSync', welcomeHtml).catch(console.error);
 
@@ -170,7 +170,7 @@ export const verifyEmail = async (req, res, next) => {
     await verifyUserEmail(user.id);
     
     // Redirect to frontend login with a success parameter
-    res.redirect('http://localhost:3000/login?verified=true');
+    res.redirect(`${env.CLIENT_URL}/login?verified=true`);
   } catch (err) {
     next(err);
   }
@@ -242,13 +242,15 @@ export const verifyMagicLink = async (req, res, next) => {
 export const requestPasswordReset = async (req, res, next) => {
   try {
     const { email } = req.body;
+    if (!email) throw new AppError('Email is required', 400);
+
     const user = await findUserByEmail(email);
     if (!user) {
       return res.status(200).json({ message: 'If an account exists, a reset link was sent' });
     }
 
     const { token } = await generateVerificationToken(email, 'PASSWORD_RESET');
-    const link = `http://localhost:3000/auth/reset-password?token=${token}`;
+    const link = `${env.CLIENT_URL}/auth/reset-password?token=${token}`;
     
     await sendEmail(email, 'Password Reset', `<p>Click <a href="${link}">here</a> to reset your password.</p>`);
     res.status(200).json({ message: 'If an account exists, a reset link was sent' });
@@ -256,6 +258,8 @@ export const requestPasswordReset = async (req, res, next) => {
     next(err);
   }
 };
+
+export const forgotPassword = requestPasswordReset;
 
 export const resetPassword = async (req, res, next) => {
   try {
@@ -281,10 +285,12 @@ export const oauthRedirect = (req, res, next) => {
     const { provider } = req.params;
     
     if (provider === 'google') {
-      const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${env.GOOGLE_CLIENT_ID}&redirect_uri=http://localhost:4000/api/auth/oauth/google/callback&response_type=code&scope=profile email`;
+      const redirectUri = `${env.API_BASE_URL}/api/auth/oauth/google/callback`;
+      const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=profile%20email`;
       return res.redirect(url);
     } else if (provider === 'github') {
-      const url = `https://github.com/login/oauth/authorize?client_id=${env.GITHUB_CLIENT_ID}&redirect_uri=http://localhost:4000/api/auth/oauth/github/callback&scope=user:email`;
+      const redirectUri = `${env.API_BASE_URL}/api/auth/oauth/github/callback`;
+      const url = `https://github.com/login/oauth/authorize?client_id=${env.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:email`;
       return res.redirect(url);
     }
     
@@ -312,7 +318,7 @@ export const oauthCallback = async (req, res, next) => {
           client_id: env.GOOGLE_CLIENT_ID,
           client_secret: env.GOOGLE_CLIENT_SECRET,
           code,
-          redirect_uri: 'http://localhost:4000/api/auth/oauth/google/callback',
+          redirect_uri: `${env.API_BASE_URL}/api/auth/oauth/google/callback`,
           grant_type: 'authorization_code'
         })
       });
@@ -341,10 +347,10 @@ export const oauthCallback = async (req, res, next) => {
           'Accept': 'application/json'
         },
         body: JSON.stringify({
-          client_id: process.env.GITHUB_CLIENT_ID,
-          client_secret: process.env.GITHUB_CLIENT_SECRET,
+          client_id: env.GITHUB_CLIENT_ID,
+          client_secret: env.GITHUB_CLIENT_SECRET,
           code,
-          redirect_uri: 'http://localhost:4000/api/auth/oauth/github/callback',
+          redirect_uri: `${env.API_BASE_URL}/api/auth/oauth/github/callback`,
         })
       });
       const tokenData = await tokenRes.json();
@@ -403,7 +409,7 @@ export const oauthCallback = async (req, res, next) => {
     });
 
     setAuthCookies(res, session.accessToken, session.refreshToken);
-    res.redirect('http://localhost:3000/dashboard');
+    res.redirect(`${env.CLIENT_URL}/projects`);
   } catch (err) {
     next(err);
   }
