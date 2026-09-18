@@ -348,10 +348,15 @@ export const oauthCallback = async (req, res, next) => {
       
       profile = {
         email: userData.email,
-        providerAccountId: userData.id,
-        name: userData.name,
-        avatarUrl: userData.picture
+        providerAccountId: String(userData.id || userData.sub || ''),
+        name: userData.name || userData.given_name || (userData.email ? userData.email.split('@')[0] : 'User'),
+        avatarUrl: userData.picture || null
       };
+
+      if (!profile.email || !profile.providerAccountId) {
+        console.error('Google profile missing email or id:', userData);
+        return res.redirect(`${env.CLIENT_URL || 'http://localhost:5173'}/login?error=Google+profile+incomplete`);
+      }
 
     } else if (provider === 'github') {
       const redirectUri = getOAuthRedirectUri('github');
@@ -372,7 +377,7 @@ export const oauthCallback = async (req, res, next) => {
       const tokenData = await tokenRes.json();
       if (!tokenData.access_token) {
         console.error('GitHub token exchange error:', tokenData);
-        return res.redirect(`${env.CLIENT_URL}/login?error=${encodeURIComponent(tokenData.error_description || tokenData.error || 'GitHub token exchange failed')}`);
+        return res.redirect(`${env.CLIENT_URL || 'http://localhost:5173'}/login?error=${encodeURIComponent(tokenData.error_description || tokenData.error || 'GitHub token exchange failed')}`);
       }
 
       // 2. Fetch user profile
@@ -393,17 +398,17 @@ export const oauthCallback = async (req, res, next) => {
       }
 
       if (!email) {
-        return res.redirect(`${env.CLIENT_URL}/login?error=No+email+found+for+GitHub+account`);
+        return res.redirect(`${env.CLIENT_URL || 'http://localhost:5173'}/login?error=No+email+found+for+GitHub+account`);
       }
 
       profile = {
         email: email,
-        providerAccountId: userData.id.toString(),
+        providerAccountId: String(userData.id || userData.login || ''),
         name: userData.name || userData.login,
-        avatarUrl: userData.avatar_url
+        avatarUrl: userData.avatar_url || null
       };
     } else {
-      return res.redirect(`${env.CLIENT_URL}/login?error=Unsupported+OAuth+provider`);
+      return res.redirect(`${env.CLIENT_URL || 'http://localhost:5173'}/login?error=Unsupported+OAuth+provider`);
     }
 
     const { user, isNewUser } = await findOrCreateOAuthUser({ 
@@ -430,9 +435,11 @@ export const oauthCallback = async (req, res, next) => {
     });
 
     setAuthCookies(res, session.accessToken, session.refreshToken);
-    res.redirect(`${env.CLIENT_URL}/projects`);
+    const clientBase = (env.CLIENT_URL || 'http://localhost:5173').replace(/\/+$/, '');
+    res.redirect(`${clientBase}/projects`);
   } catch (err) {
     console.error('OAuth callback unhandled error:', err);
-    res.redirect(`${env.CLIENT_URL}/login?error=${encodeURIComponent(err.message || 'Authentication error')}`);
+    const clientBase = (env.CLIENT_URL || 'http://localhost:5173').replace(/\/+$/, '');
+    res.redirect(`${clientBase}/login?error=${encodeURIComponent(err.message || 'Authentication error')}`);
   }
 };
