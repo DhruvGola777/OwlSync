@@ -364,7 +364,7 @@ export const oauthCallback = async (req, res, next) => {
 
       if (!profile.email || !profile.providerAccountId) {
         console.error('Google profile missing email or id:', userData);
-        return res.redirect(`${env.CLIENT_URL || 'http://localhost:5173'}/login?error=Google+profile+incomplete`);
+        return res.redirect(`${env.CLIENT_URL || 'http://localhost:3000'}/login?error=Google+profile+incomplete`);
       }
 
     } else if (provider === 'github') {
@@ -386,7 +386,7 @@ export const oauthCallback = async (req, res, next) => {
       const tokenData = await tokenRes.json();
       if (!tokenData.access_token) {
         console.error('GitHub token exchange error:', tokenData);
-        return res.redirect(`${env.CLIENT_URL || 'http://localhost:5173'}/login?error=${encodeURIComponent(tokenData.error_description || tokenData.error || 'GitHub token exchange failed')}`);
+        return res.redirect(`${env.CLIENT_URL || 'http://localhost:3000'}/login?error=${encodeURIComponent(tokenData.error_description || tokenData.error || 'GitHub token exchange failed')}`);
       }
 
       // 2. Fetch user profile
@@ -407,7 +407,7 @@ export const oauthCallback = async (req, res, next) => {
       }
 
       if (!email) {
-        return res.redirect(`${env.CLIENT_URL || 'http://localhost:5173'}/login?error=No+email+found+for+GitHub+account`);
+        return res.redirect(`${env.CLIENT_URL || 'http://localhost:3000'}/login?error=No+email+found+for+GitHub+account`);
       }
 
       profile = {
@@ -417,7 +417,7 @@ export const oauthCallback = async (req, res, next) => {
         avatarUrl: userData.avatar_url || null
       };
     } else {
-      return res.redirect(`${env.CLIENT_URL || 'http://localhost:5173'}/login?error=Unsupported+OAuth+provider`);
+      return res.redirect(`${env.CLIENT_URL || 'http://localhost:3000'}/login?error=Unsupported+OAuth+provider`);
     }
 
     const { user, isNewUser } = await findOrCreateOAuthUser({ 
@@ -444,11 +444,11 @@ export const oauthCallback = async (req, res, next) => {
     });
 
     setAuthCookies(res, session.accessToken, session.refreshToken);
-    const clientBase = (env.CLIENT_URL || 'http://localhost:5173').replace(/\/+$/, '');
+    const clientBase = (env.CLIENT_URL || 'http://localhost:3000').replace(/\/+$/, '');
     res.redirect(`${clientBase}/projects?token=${session.accessToken}&refreshToken=${session.refreshToken}`);
   } catch (err) {
     console.error('OAuth callback unhandled error:', err);
-    const clientBase = (env.CLIENT_URL || 'http://localhost:5173').replace(/\/+$/, '');
+    const clientBase = (env.CLIENT_URL || 'http://localhost:3000').replace(/\/+$/, '');
     res.redirect(`${clientBase}/login?error=${encodeURIComponent(err.message || 'Authentication error')}`);
   }
 };

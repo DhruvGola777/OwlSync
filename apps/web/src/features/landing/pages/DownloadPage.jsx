@@ -23,7 +23,7 @@ export const DownloadPage = () => {
     }
   }, []);
 
-  const handleDownload = (platform, format = 'installer') => {
+  const handleDownload = async (platform, format = 'installer') => {
     setDownloading(true);
     let fileName = 'OwlSync-Setup-1.0.0.exe';
     let downloadUrl = 'https://github.com/DhruvGola777/OwlSync/releases/download/v1.0.0/OwlSync-Setup-1.0.0.exe';
@@ -54,24 +54,24 @@ export const DownloadPage = () => {
       }
     }
 
-    setDownloadMessage(`Downloading ${fileName}...`);
+    setDownloadMessage(`Checking ${fileName}...`);
 
-    // Trigger real download link via anchor tag
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.setAttribute('download', fileName);
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    try {
+      const response = await fetch(downloadUrl, { method: 'HEAD' });
+      if (!response.ok) {
+        throw new Error('Release asset is unavailable');
+      }
 
-    setTimeout(() => {
-      setDownloadMessage(`✅ ${fileName} download started! Check your downloads.`);
-      setTimeout(() => {
-        setDownloading(false);
-      }, 3500);
-    }, 800);
+      window.location.assign(downloadUrl);
+      setDownloadMessage(`Downloading ${fileName}...`);
+    } catch {
+      setDownloadMessage(`${fileName} is not available in the current release.`);
+      window.setTimeout(() => {
+        window.open('https://github.com/DhruvGola777/OwlSync/releases', '_blank', 'noopener,noreferrer');
+      }, 1000);
+    } finally {
+      window.setTimeout(() => setDownloading(false), 1500);
+    }
   };
 
   const getPrimaryLabel = () => {

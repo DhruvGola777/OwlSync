@@ -16,11 +16,12 @@ export const Login = () => {
     : searchParams.get('verified') 
     ? 'Email verified successfully! You can now sign in.' 
     : '';
+  const callbackError = searchParams.get('error');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [token, setToken] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(callbackError || '');
   const [success, setSuccess] = useState(successMessage);
   const [isLoading, setIsLoading] = useState(false);
   
