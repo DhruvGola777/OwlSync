@@ -77,6 +77,8 @@ function createWindow() {
 
   mainWindow.on('unmaximize', () => {
     mainWindow?.webContents.send('window:maximizedChange', false);
+  });
+
   // Allow F12 or Ctrl+Shift+I to open DevTools for troubleshooting
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i')) {
