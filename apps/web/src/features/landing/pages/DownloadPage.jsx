@@ -29,29 +29,23 @@ export const DownloadPage = () => {
   const handleDownload = (platform, format = 'installer') => {
     setDownloading(true);
     let fileName = 'OwlSync-Setup-1.0.0.exe';
-    let downloadPath = '/api/download/windows';
+    // Direct release binary download URL (initiates download in browser tray immediately)
+    let downloadUrl = 'https://github.com/DhruvGola777/OwlSync/releases/latest/download/OwlSync-Setup-1.0.0.exe';
 
     if (platform === 'windows') {
-      if (format === 'portable') {
-        fileName = 'OwlSync-Windows-Portable.zip';
-        downloadPath = '/api/download/portable';
-      } else {
-        fileName = 'OwlSync-Setup-1.0.0.exe';
-        downloadPath = '/api/download/windows';
-      }
+      fileName = 'OwlSync-Setup-1.0.0.exe';
+      downloadUrl = 'https://github.com/DhruvGola777/OwlSync/releases/latest/download/OwlSync-Setup-1.0.0.exe';
     } else if (platform === 'mac') {
       fileName = 'OwlSync-1.0.0.dmg';
-      downloadPath = '/api/download/mac';
+      downloadUrl = 'https://github.com/DhruvGola777/OwlSync/releases/latest/download/OwlSync-1.0.0.dmg';
     } else if (platform === 'linux') {
       fileName = 'OwlSync-1.0.0.AppImage';
-      downloadPath = '/api/download/linux';
+      downloadUrl = 'https://github.com/DhruvGola777/OwlSync/releases/latest/download/OwlSync-1.0.0.AppImage';
     }
-
-    const downloadUrl = `${backendOrigin}${downloadPath}`;
 
     setDownloadMessage(`Downloading ${fileName}...`);
 
-    // Trigger instant direct download via backend endpoint
+    // Direct download trigger (browser initiates file download without leaving the page)
     const link = document.createElement('a');
     link.href = downloadUrl;
     link.setAttribute('download', fileName);

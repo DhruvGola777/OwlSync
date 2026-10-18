@@ -69,8 +69,8 @@ router.get('/windows', (req, res) => {
     return res.download(WIN_UNPACKED_EXE, 'OwlSync.exe');
   }
 
-  // 4. Fallback to GitHub release
-  return res.redirect('https://github.com/DhruvGola777/OwlSync/releases');
+  // 4. Fallback to direct GitHub release binary download
+  return res.redirect('https://github.com/DhruvGola777/OwlSync/releases/latest/download/OwlSync-Setup-1.0.0.exe');
 });
 
 // Download Windows portable (.zip or .exe)
