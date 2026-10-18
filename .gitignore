@@ -16,3 +16,7 @@ storage/
 !**/storage/recordings/.gitkeep
 *.webm
 *.mp4
+web-dist
+*.exe
+*.zip
+*.blockmap
