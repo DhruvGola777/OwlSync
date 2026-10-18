@@ -12,6 +12,9 @@ jobs:
   release:
     name: Build Windows Desktop Release
     runs-on: windows-latest
+    env:
+      DATABASE_URL: "postgresql://postgres:password@localhost:5432/postgres"
+      DIRECT_URL: "postgresql://postgres:password@localhost:5432/postgres"
 
     steps:
       - name: Checkout
