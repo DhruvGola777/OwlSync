@@ -86,7 +86,13 @@ function createWindow() {
       setTimeout(() => mainWindow?.loadURL(devUrl), 2000);
     });
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../../web/dist/index.html'));
+    const packagedPath = path.join(__dirname, '../web-dist/index.html');
+    const localPath = path.join(__dirname, '../../web/dist/index.html');
+    if (fs.existsSync(packagedPath)) {
+      mainWindow.loadFile(packagedPath);
+    } else {
+      mainWindow.loadFile(localPath);
+    }
   }
 
   mainWindow.on('closed', () => {

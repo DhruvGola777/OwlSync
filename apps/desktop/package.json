@@ -24,6 +24,7 @@
     },
     "files": [
       "src/**/*",
+      "web-dist/**/*",
       "../web/dist/**/*",
       "resources/**/*"
     ],
@@ -35,7 +36,8 @@
         "nsis",
         "portable"
       ],
-      "icon": "resources/icon.png"
+      "icon": "resources/icon.png",
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,

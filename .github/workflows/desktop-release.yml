@@ -15,10 +15,16 @@ jobs:
     env:
       DATABASE_URL: "postgresql://postgres:password@localhost:5432/postgres"
       DIRECT_URL: "postgresql://postgres:password@localhost:5432/postgres"
+      CSC_IDENTITY_AUTO_DISCOVERY: false
+      WIN_CSC_LINK: ""
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Enable Developer Mode (symlinks)
+        run: reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /f /v "AllowDevelopmentWithoutDevLicense" /d "1"
+        shell: cmd
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -35,14 +41,23 @@ jobs:
       - name: Build web application
         run: npm --prefix apps/web run build
 
+      - name: Copy web build to desktop
+        run: |
+          mkdir -Force apps\desktop\web-dist
+          Copy-Item -Path "apps\web\dist\*" -Destination "apps\desktop\web-dist\" -Recurse -Force
+        shell: powershell
+
       - name: Build Windows installer
         run: npm --prefix apps/desktop run build:win
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           generate_release_notes: true
           files: |
             apps/desktop/dist/*.exe
+            apps/desktop/dist/*.zip
             apps/desktop/dist/*.blockmap
             apps/desktop/dist/latest.yml
