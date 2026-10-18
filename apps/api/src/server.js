@@ -60,6 +60,17 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 }));
 app.get('/docs', (req, res) => res.redirect('/api-docs'));
 
+// Root endpoint for health check & service verification
+app.get('/', (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    message: '🚀 OwlSync API is running smoothly',
+    version: '1.0.0',
+    documentation: '/docs',
+    health: '/health',
+  });
+});
+
 // Health & Metrics Endpoints
 app.use('/health', healthRoutes);
 app.use('/api/health', healthRoutes);
