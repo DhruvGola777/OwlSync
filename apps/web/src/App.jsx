@@ -1,8 +1,11 @@
 import React from 'react';
-import { BrowserRouter as Router } from 'react-router-dom';
+import { BrowserRouter, HashRouter } from 'react-router-dom';
 import { AuthProvider } from './providers/AuthProvider';
 import { ThemeProvider } from './providers/ThemeProvider';
 import { AppRouter } from './router/AppRouter';
+
+const isElectron = typeof window !== 'undefined' && (!!window.electronAPI || window.navigator.userAgent.includes('Electron'));
+const Router = isElectron ? HashRouter : BrowserRouter;
 
 function App() {
   return (

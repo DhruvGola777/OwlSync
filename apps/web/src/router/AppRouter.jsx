@@ -49,6 +49,9 @@ export const AppRouter = () => {
           <Route path="/profile/:username" element={<PublicProfile />} />
         </Route>
       </Route>
+
+      {/* Catch-all fallback */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };
