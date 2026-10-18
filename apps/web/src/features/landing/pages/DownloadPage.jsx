@@ -4,12 +4,15 @@ import {
   Download, ArrowRight, ShieldCheck, Zap, HardDrive, 
   Code2, Check, ExternalLink, Laptop, Terminal, Sparkles, Cpu, RefreshCw
 } from 'lucide-react';
+import { API_URL } from '../../../services/api';
 
 export const DownloadPage = () => {
   const navigate = useNavigate();
   const [os, setOs] = useState('windows'); // 'windows', 'mac', 'linux'
   const [downloading, setDownloading] = useState(false);
   const [downloadMessage, setDownloadMessage] = useState('');
+
+  const backendOrigin = API_URL.replace(/\/api\/?$/, '');
 
   useEffect(() => {
     // Detect OS from userAgent
@@ -23,61 +26,49 @@ export const DownloadPage = () => {
     }
   }, []);
 
-  const handleDownload = async (platform, format = 'installer') => {
+  const handleDownload = (platform, format = 'installer') => {
     setDownloading(true);
     let fileName = 'OwlSync-Setup-1.0.0.exe';
-    let downloadUrl = 'https://github.com/DhruvGola777/OwlSync/releases/download/v1.0.0/OwlSync-Setup-1.0.0.exe';
+    let downloadPath = '/api/download/windows';
 
     if (platform === 'windows') {
       if (format === 'portable') {
         fileName = 'OwlSync-Windows-Portable.zip';
-        downloadUrl = 'https://github.com/DhruvGola777/OwlSync/releases/download/v1.0.0/OwlSync-Windows-Portable.zip';
+        downloadPath = '/api/download/portable';
       } else {
         fileName = 'OwlSync-Setup-1.0.0.exe';
-        downloadUrl = 'https://github.com/DhruvGola777/OwlSync/releases/download/v1.0.0/OwlSync-Setup-1.0.0.exe';
+        downloadPath = '/api/download/windows';
       }
     } else if (platform === 'mac') {
-      if (format === 'intel') {
-        fileName = 'OwlSync-1.0.0-x64.dmg';
-        downloadUrl = 'https://github.com/DhruvGola777/OwlSync/releases/download/v1.0.0/OwlSync-1.0.0-x64.dmg';
-      } else {
-        fileName = 'OwlSync-1.0.0-arm64.dmg';
-        downloadUrl = 'https://github.com/DhruvGola777/OwlSync/releases/download/v1.0.0/OwlSync-1.0.0-arm64.dmg';
-      }
+      fileName = 'OwlSync-1.0.0.dmg';
+      downloadPath = '/api/download/mac';
     } else if (platform === 'linux') {
-      if (format === 'deb') {
-        fileName = 'owlsync_1.0.0_amd64.deb';
-        downloadUrl = 'https://github.com/DhruvGola777/OwlSync/releases/download/v1.0.0/owlsync_1.0.0_amd64.deb';
-      } else {
-        fileName = 'OwlSync-1.0.0.AppImage';
-        downloadUrl = 'https://github.com/DhruvGola777/OwlSync/releases/download/v1.0.0/OwlSync-1.0.0.AppImage';
-      }
+      fileName = 'OwlSync-1.0.0.AppImage';
+      downloadPath = '/api/download/linux';
     }
 
-    setDownloadMessage(`Checking ${fileName}...`);
+    const downloadUrl = `${backendOrigin}${downloadPath}`;
 
-    try {
-      const response = await fetch(downloadUrl, { method: 'HEAD' });
-      if (!response.ok) {
-        throw new Error('Release asset is unavailable');
-      }
+    setDownloadMessage(`Downloading ${fileName}...`);
 
-      window.location.assign(downloadUrl);
-      setDownloadMessage(`Downloading ${fileName}...`);
-    } catch {
-      setDownloadMessage(`${fileName} is not available in the current release.`);
-      window.setTimeout(() => {
-        window.open('https://github.com/DhruvGola777/OwlSync/releases', '_blank', 'noopener,noreferrer');
-      }, 1000);
-    } finally {
-      window.setTimeout(() => setDownloading(false), 1500);
-    }
+    // Trigger instant direct download via backend endpoint
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    window.setTimeout(() => {
+      setDownloading(false);
+      setDownloadMessage(`Download started for ${fileName}! Check your browser downloads.`);
+    }, 1500);
   };
 
   const getPrimaryLabel = () => {
-    if (os === 'windows') return { text: 'Download for Windows', ext: '.exe (64-bit)' };
-    if (os === 'mac') return { text: 'Download for macOS', ext: '.dmg (Apple Silicon & Intel)' };
-    return { text: 'Download for Linux', ext: '.AppImage / .deb' };
+    if (os === 'windows') return { text: 'Download for Windows', ext: '.exe / .zip' };
+    if (os === 'mac') return { text: 'Download for macOS', ext: '.dmg' };
+    return { text: 'Download for Linux', ext: '.AppImage' };
   };
 
   const primary = getPrimaryLabel();
@@ -99,10 +90,10 @@ export const DownloadPage = () => {
             <span className="text-xl font-bold tracking-tight text-white">OwlSync</span>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             <button 
               onClick={() => navigate('/projects')}
-              className="text-sm font-medium text-slate-300 hover:text-white transition"
+              className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-medium text-slate-200 hover:text-white transition border border-slate-700/60"
             >
               Open Web App
             </button>
@@ -125,33 +116,46 @@ export const DownloadPage = () => {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center relative z-10">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-6">
             <Sparkles size={14} />
-            OwlSync Desktop v1.0.0 Now Available
+            OwlSync Collaborative Cloud & Desktop IDE
           </div>
 
           <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white mb-6 leading-tight">
             Code, sync, and collaborate.<br />
             <span className="bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400 bg-clip-text text-transparent">
-              Directly on your Desktop.
+              In Browser or on Desktop.
             </span>
           </h1>
 
           <p className="text-lg text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Experience sub-10ms Monaco pair programming, native local filesystem access, WebRTC voice rooms, and AI assistance in a native standalone application.
+            Experience sub-10ms Monaco pair programming, native local filesystem access, real-time shared whiteboard, WebRTC voice rooms, and AI assistance.
           </p>
 
-          {/* Primary Download CTA */}
+          {/* Primary Dual Action CTA */}
           <div className="flex flex-col items-center justify-center gap-4 mb-8">
-            <button
-              onClick={() => handleDownload(os)}
-              disabled={downloading}
-              className="px-8 py-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-lg shadow-xl shadow-indigo-600/30 transition transform hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-3 disabled:opacity-70 cursor-pointer"
-            >
-              <Download size={22} className={downloading ? 'animate-bounce' : ''} />
-              <span>{primary.text}</span>
-              <span className="text-xs bg-white/20 px-2 py-0.5 rounded font-mono font-normal">
-                {primary.ext}
-              </span>
-            </button>
+            <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+              {/* Option 1: Launch in Browser */}
+              <button
+                onClick={() => navigate('/projects')}
+                className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-lg shadow-xl shadow-indigo-600/30 transition transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-3 cursor-pointer group"
+              >
+                <Code2 size={22} className="text-indigo-200" />
+                <span>Launch Web IDE</span>
+                <ArrowRight size={18} className="text-indigo-200 group-hover:translate-x-1 transition-transform" />
+              </button>
+
+              {/* Option 2: Download Desktop App */}
+              <button
+                onClick={() => handleDownload(os)}
+                disabled={downloading}
+                className="w-full sm:w-auto px-7 py-4 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-white font-semibold text-lg border border-slate-700/80 hover:border-indigo-500/50 shadow-lg shadow-black/20 transition transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-3 disabled:opacity-70 cursor-pointer"
+              >
+                <Download size={20} className={downloading ? 'animate-bounce text-indigo-400' : 'text-slate-300'} />
+                <span>{primary.text}</span>
+                <span className="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-mono font-normal border border-slate-700">
+                  {primary.ext}
+                </span>
+              </button>
+            </div>
 
             {downloadMessage && (
               <div className="text-sm font-medium text-emerald-400 animate-fade-in flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-xl">
@@ -160,16 +164,18 @@ export const DownloadPage = () => {
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row items-center gap-3 text-xs text-slate-500">
-              <span>Free & Open Source under MIT License • SHA-256 Verified</span>
+            <div className="flex flex-col sm:flex-row items-center gap-3 text-xs text-slate-500 mt-2">
+              <span>⚡ No installation required to use in browser</span>
+              <span className="hidden sm:inline">•</span>
+              <span>Free & Open Source under MIT License</span>
               <span className="hidden sm:inline">•</span>
               <a 
-                href="https://github.com/DhruvGola777/OwlSync/releases" 
+                href="https://github.com/DhruvGola777/OwlSync" 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="text-indigo-400 hover:text-indigo-300 inline-flex items-center gap-1 transition"
               >
-                <span>All releases on GitHub</span>
+                <span>GitHub Repository</span>
                 <ExternalLink size={12} />
               </a>
             </div>

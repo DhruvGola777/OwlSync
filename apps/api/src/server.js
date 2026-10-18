@@ -12,6 +12,7 @@ import aiRoutes from './modules/ai/ai.routes.js';
 import recordingsRoutes from './modules/recordings/recordings.routes.js';
 import analyticsRoutes from './modules/analytics/analytics.routes.js';
 import searchRoutes from './modules/search/search.routes.js';
+import downloadRoutes from './modules/downloads/downloads.routes.js';
 import notificationsRoutes from './modules/notifications/notifications.routes.js';
 import teamsRoutes from './modules/teams/teams.routes.js';
 import badgesRoutes from './modules/badges/badges.routes.js';
@@ -77,6 +78,8 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/recordings', recordingsRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/download', downloadRoutes);
+app.use('/api/downloads', downloadRoutes);
 
 // Phase 2 RabbitMQ Test Route
 app.get('/api/test-email', async (req, res) => {

@@ -9,7 +9,13 @@ export default defineConfig({
   server: {
     port: 3000,
     strictPort: false,
-    host: '127.0.0.1'
+    host: '127.0.0.1',
+    proxy: {
+      '/api': {
+        target: 'http://localhost:4000',
+        changeOrigin: true
+      }
+    }
   },
   resolve: {
     alias: (() => {
