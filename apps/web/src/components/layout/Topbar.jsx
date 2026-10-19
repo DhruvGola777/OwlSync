@@ -9,9 +9,10 @@ import { WindowControls } from './WindowControls';
 import { useNavigate } from 'react-router-dom';
 
 export const Topbar = ({ isSidebarOpen, setIsSidebarOpen }) => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const isGuest = user?.email?.includes('guest_') || user?.name === 'Guest Developer';
 
   // Global Ctrl + K / Cmd + K shortcut
   useEffect(() => {
@@ -54,6 +55,21 @@ export const Topbar = ({ isSidebarOpen, setIsSidebarOpen }) => {
           </div>
           
           <div className="flex flex-1 justify-end items-center gap-x-4 lg:gap-x-6">
+            {isGuest && (
+              <button
+                onClick={() => {
+                  logout();
+                  navigate('/login');
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 hover:border-amber-300 transition shadow-sm"
+                title="You are in a guest session. Click to sign in or create a permanent account."
+              >
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                <span>Guest Mode</span>
+                <span className="font-semibold text-indigo-600 hover:text-indigo-800 ml-1">Sign In</span>
+              </button>
+            )}
+
             <FriendsMenu />
             <NotificationsMenu />
             
