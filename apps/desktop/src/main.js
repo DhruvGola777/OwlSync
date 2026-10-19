@@ -49,66 +49,81 @@ ipcMain.handle('shell:openExternal', async (_event, url) => {
   return await shell.openExternal(url);
 });
 
+const http = require('http');
+
+let loopbackServer = null;
+
 ipcMain.handle('auth:startOAuth', async (_event, provider) => {
   return new Promise((resolve) => {
+    if (loopbackServer) {
+      try { loopbackServer.close(); } catch (e) {}
+      loopbackServer = null;
+    }
+
     const authUrl = `https://owlsync-api.onrender.com/api/auth/oauth/${provider}`;
-    const authWindow = new BrowserWindow({
-      width: 520,
-      height: 680,
-      parent: mainWindow || undefined,
-      modal: true,
-      title: `Sign in with ${provider.charAt(0).toUpperCase() + provider.slice(1)} - OwlSync`,
-      autoHideMenuBar: true,
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true
-      }
-    });
-
-    authWindow.setMenu(null);
-
-    // Use standard Chrome browser User-Agent so Google OAuth does not block embedded Electron agent
-    const chromeUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
-    authWindow.webContents.setUserAgent(chromeUA);
-
     let isHandled = false;
 
-    const checkUrl = (targetUrl) => {
-      try {
-        if (!targetUrl || isHandled) return;
-        const parsed = new URL(targetUrl);
-        if (parsed.searchParams.has('token')) {
-          isHandled = true;
-          const token = parsed.searchParams.get('token');
-          const refreshToken = parsed.searchParams.get('refreshToken');
-          setTimeout(() => {
-            if (!authWindow.isDestroyed()) authWindow.destroy();
-          }, 300);
-          resolve({ success: true, token, refreshToken });
-        } else if (parsed.searchParams.has('error')) {
-          isHandled = true;
-          const error = parsed.searchParams.get('error');
-          setTimeout(() => {
-            if (!authWindow.isDestroyed()) authWindow.destroy();
-          }, 300);
-          resolve({ success: false, error });
-        }
-      } catch (e) {
-        // Ignore parsing errors for interim non-standard URLs
-      }
-    };
-
-    authWindow.webContents.on('will-redirect', (_e, url) => checkUrl(url));
-    authWindow.webContents.on('will-navigate', (_e, url) => checkUrl(url));
-    authWindow.webContents.on('did-navigate', (_e, url) => checkUrl(url));
-
-    authWindow.on('closed', () => {
+    // Timeout after 2.5 minutes if the user doesn't complete browser login
+    const timeoutTimer = setTimeout(() => {
       if (!isHandled) {
-        resolve({ success: false, cancelled: true });
+        isHandled = true;
+        if (loopbackServer) {
+          try { loopbackServer.close(); } catch (e) {}
+          loopbackServer = null;
+        }
+        resolve({ success: false, timeout: true });
       }
+    }, 150000);
+
+    loopbackServer = http.createServer((req, res) => {
+      try {
+        const reqUrl = new URL(req.url, 'http://127.0.0.1:48123');
+        if (reqUrl.pathname === '/callback') {
+          const token = reqUrl.searchParams.get('token');
+          const refreshToken = reqUrl.searchParams.get('refreshToken');
+
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Access-Control-Allow-Origin': '*'
+          });
+          res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>OwlSync - Signed In</title><style>body{margin:0;display:flex;align-items:center;justify-content:center;height:100vh;background:#0f172a;color:#f8fafc;font-family:system-ui,-apple-system,sans-serif}.card{text-align:center;background:#1e293b;padding:40px;border-radius:16px;box-shadow:0 10px 25px rgba(0,0,0,0.5)}h1{margin:0 0 12px;font-size:24px;color:#38bdf8}p{margin:0;color:#94a3b8;font-size:15px}</style></head><body><div class="card"><h1>Authentication Successful!</h1><p>You can close this tab and return to OwlSync Desktop.</p></div></body></html>`);
+
+          if (!isHandled && token) {
+            isHandled = true;
+            clearTimeout(timeoutTimer);
+
+            setTimeout(() => {
+              if (loopbackServer) {
+                try { loopbackServer.close(); } catch (e) {}
+                loopbackServer = null;
+              }
+            }, 1000);
+
+            if (mainWindow) {
+              if (mainWindow.isMinimized()) mainWindow.restore();
+              mainWindow.focus();
+            }
+
+            resolve({ success: true, token, refreshToken });
+          }
+          return;
+        }
+      } catch (err) {
+        console.error('Loopback request error:', err);
+      }
+
+      res.writeHead(404);
+      res.end('Not found');
     });
 
-    authWindow.loadURL(authUrl);
+    loopbackServer.listen(48123, '127.0.0.1', () => {
+      shell.openExternal(authUrl);
+    });
+
+    loopbackServer.on('error', (err) => {
+      console.error('Loopback server error:', err);
+      shell.openExternal(authUrl);
+    });
   });
 });
 

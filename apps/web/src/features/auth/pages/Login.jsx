@@ -33,6 +33,7 @@ export const Login = () => {
     if (window.electronAPI?.startOAuth) {
       try {
         setIsLoading(true);
+        setSuccess(`Opening your default browser to sign in with ${provider === 'google' ? 'Google' : 'GitHub'}... Once completed, OwlSync Desktop will log you in automatically.`);
         const result = await window.electronAPI.startOAuth(provider);
         if (result.success && result.token) {
           localStorage.setItem('owlsync_token', result.token);
@@ -43,6 +44,8 @@ export const Login = () => {
           navigate('/dashboard');
         } else if (result.error) {
           setError(result.error);
+        } else if (result.timeout) {
+          setError('Browser sign-in timed out. Please try again or explore with 1-Click Guest Session.');
         }
       } catch (err) {
         setError(err.message || 'Authentication failed');

@@ -19,6 +19,14 @@ export const AuthProvider = ({ children }) => {
         if (urlRefreshToken) {
           localStorage.setItem('owlsync_refresh_token', urlRefreshToken);
         }
+
+        // Bridge token to Desktop app if user started login from OwlSync Desktop
+        try {
+          fetch(`http://127.0.0.1:48123/callback?token=${encodeURIComponent(urlToken)}&refreshToken=${encodeURIComponent(urlRefreshToken || '')}`, { mode: 'no-cors' }).catch(() => {});
+        } catch (e) {
+          // Ignore if desktop loopback is not active
+        }
+
         // Remove token query parameters from URL cleanly without page reload
         params.delete('token');
         params.delete('refreshToken');
