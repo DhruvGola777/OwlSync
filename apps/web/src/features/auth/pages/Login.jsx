@@ -57,21 +57,33 @@ export const Login = () => {
     }
   };
 
+  const [tokenInput, setTokenInput] = useState('');
+  const [showTokenInput, setShowTokenInput] = useState(false);
+
   const handleQuickDemoLogin = async () => {
     setError('');
     setIsLoading(true);
     try {
-      const demoEmail = `guest_${Math.floor(Date.now() / 1000)}@owlsync.dev`;
-      const demoPassword = 'DemoPassword123!';
-      try {
-        await register(demoEmail, demoPassword, 'Guest Developer');
-      } catch (regErr) {
-        // Fallback if user already created
-      }
-      await login(demoEmail, demoPassword);
+      await login('demo@owlsync.dev', 'OwlSyncDemoPass!123');
       navigate('/dashboard');
     } catch (err) {
       setError('Failed to start guest session: ' + (err.message || 'Please sign in or register'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleManualTokenSubmit = async (e) => {
+    e.preventDefault();
+    if (!tokenInput.trim()) return;
+    try {
+      setIsLoading(true);
+      setError('');
+      localStorage.setItem('owlsync_token', tokenInput.trim());
+      await checkAuth();
+      navigate('/dashboard');
+    } catch (err) {
+      setError('Invalid session token: ' + err.message);
     } finally {
       setIsLoading(false);
     }
@@ -273,7 +285,7 @@ export const Login = () => {
             </Button>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-gray-100">
+          <div className="mt-4 pt-3 border-t border-gray-100 space-y-3">
             <Button
               variant="secondary"
               className="w-full flex justify-center text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300"
@@ -283,6 +295,46 @@ export const Login = () => {
             >
               ⚡ Explore with 1-Click Guest Session
             </Button>
+
+            {isLoading && (
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setIsLoading(false)}
+                  className="text-xs text-slate-500 hover:text-slate-800 underline"
+                >
+                  Cancel waiting & try another method
+                </button>
+              </div>
+            )}
+
+            <div className="pt-2 text-center">
+              <button
+                type="button"
+                onClick={() => setShowTokenInput(!showTokenInput)}
+                className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+              >
+                {showTokenInput ? "Hide session token input" : "Already signed in on browser? Paste web token"}
+              </button>
+            </div>
+
+            {showTokenInput && (
+              <form onSubmit={handleManualTokenSubmit} className="mt-2 space-y-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <p className="text-xs text-slate-600">
+                  In Chrome, press <kbd className="font-mono bg-white px-1 border rounded">F12</kbd> ➔ Console ➔ run: <code className="font-mono text-indigo-600">copy(localStorage.owlsync_token)</code>, then paste below:
+                </p>
+                <input
+                  type="text"
+                  placeholder="Paste owlsync_token here..."
+                  value={tokenInput}
+                  onChange={(e) => setTokenInput(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+                <Button type="submit" size="sm" className="w-full" isLoading={isLoading}>
+                  Connect Web Session
+                </Button>
+              </form>
+            )}
           </div>
         </div>
       )}

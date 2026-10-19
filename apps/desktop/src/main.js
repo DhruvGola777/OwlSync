@@ -76,15 +76,29 @@ ipcMain.handle('auth:startOAuth', async (_event, provider) => {
     }, 150000);
 
     loopbackServer = http.createServer((req, res) => {
+      // Support Chrome Private Network Access (PNA) preflight
+      if (req.method === 'OPTIONS') {
+        res.writeHead(204, {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': '*',
+          'Access-Control-Allow-Private-Network': 'true',
+          'Access-Control-Max-Age': '86400'
+        });
+        res.end();
+        return;
+      }
+
       try {
         const reqUrl = new URL(req.url, 'http://127.0.0.1:48123');
-        if (reqUrl.pathname === '/callback') {
+        if (reqUrl.pathname === '/callback' || reqUrl.pathname === '/token') {
           const token = reqUrl.searchParams.get('token');
           const refreshToken = reqUrl.searchParams.get('refreshToken');
 
           res.writeHead(200, {
             'Content-Type': 'text/html; charset=utf-8',
-            'Access-Control-Allow-Origin': '*'
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Private-Network': 'true'
           });
           res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>OwlSync - Signed In</title><style>body{margin:0;display:flex;align-items:center;justify-content:center;height:100vh;background:#0f172a;color:#f8fafc;font-family:system-ui,-apple-system,sans-serif}.card{text-align:center;background:#1e293b;padding:40px;border-radius:16px;box-shadow:0 10px 25px rgba(0,0,0,0.5)}h1{margin:0 0 12px;font-size:24px;color:#38bdf8}p{margin:0;color:#94a3b8;font-size:15px}</style></head><body><div class="card"><h1>Authentication Successful!</h1><p>You can close this tab and return to OwlSync Desktop.</p></div></body></html>`);
 
