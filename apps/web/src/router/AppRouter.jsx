@@ -22,7 +22,7 @@ export const AppRouter = () => {
   return (
     <Routes>
       {/* Public / Auth Routes */}
-      <Route path="/" element={isDesktop ? <Navigate to="/login" replace /> : <DownloadPage />} />
+      <Route path="/" element={isDesktop ? <Navigate to="/dashboard" replace /> : <DownloadPage />} />
       <Route path="/download" element={<DownloadPage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />

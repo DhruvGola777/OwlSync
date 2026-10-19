@@ -38,7 +38,12 @@ export const AuthProvider = ({ children }) => {
       const data = await api.getMe();
       setUser(data.user);
     } catch (err) {
-      setUser(null);
+      const isDesktop = typeof window !== 'undefined' && Boolean(window.electronAPI?.isDesktop);
+      if (isDesktop) {
+        setUser({ id: 'local-dev', name: 'Offline Developer', username: 'offline_dev', isLocal: true });
+      } else {
+        setUser(null);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -90,8 +95,13 @@ export const AuthProvider = ({ children }) => {
     }
     localStorage.removeItem('owlsync_token');
     localStorage.removeItem('owlsync_refresh_token');
-    await api.logout();
-    setUser(null);
+    await api.logout().catch(() => {});
+    const isDesktop = typeof window !== 'undefined' && Boolean(window.electronAPI?.isDesktop);
+    if (isDesktop) {
+      setUser({ id: 'local-dev', name: 'Offline Developer', username: 'offline_dev', isLocal: true });
+    } else {
+      setUser(null);
+    }
   };
 
   return (

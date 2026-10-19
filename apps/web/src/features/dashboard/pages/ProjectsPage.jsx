@@ -155,17 +155,26 @@ export const ProjectsPage = () => {
           <p className="text-slate-500 mb-6 max-w-sm mx-auto">
             Create a blank project or import your local codebase from your PC.
           </p>
-          <div className="flex items-center justify-center gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {isDesktop && (
+              <button
+                onClick={handleOpenLocalFolder}
+                className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium transition shadow-md shadow-indigo-200 flex items-center gap-2"
+              >
+                <HardDrive size={18} />
+                Open Local Folder
+              </button>
+            )}
             <button
               onClick={() => setShowImportModal(true)}
               className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition shadow-sm flex items-center gap-2"
             >
               <FolderUp size={18} className="text-slate-500" />
-              Import Local Code
+              Import Project
             </button>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium transition shadow-md shadow-indigo-200 flex items-center gap-2"
+              className="px-5 py-2.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-200 font-medium transition shadow-sm flex items-center gap-2"
             >
               <Plus size={18} />
               New Blank Project

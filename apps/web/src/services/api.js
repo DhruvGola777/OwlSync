@@ -46,9 +46,8 @@ apiClient.interceptors.response.use(
         // If refresh fails, they really are logged out
         const isElectron = typeof window !== 'undefined' && (Boolean(window.electronAPI) || window.navigator.userAgent.includes('Electron') || window.location.protocol === 'file:');
         if (isElectron) {
-          if (!window.location.hash.includes('/login') && !window.location.hash.includes('/register')) {
-            window.location.hash = '#/login';
-          }
+          // In desktop offline mode, do not force-redirect to login; keep user in local workspace
+          return Promise.reject(refreshError);
         } else {
           if (window.location.pathname !== '/login' && window.location.pathname !== '/register' && window.location.pathname !== '/' && window.location.pathname !== '/download') {
             window.location.href = '/login';

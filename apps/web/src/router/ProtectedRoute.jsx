@@ -14,7 +14,9 @@ export const ProtectedRoute = () => {
     );
   }
 
-  if (!user) {
+  const isDesktop = typeof window !== 'undefined' && Boolean(window.electronAPI?.isDesktop);
+
+  if (!user && !isDesktop) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

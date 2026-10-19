@@ -1,11 +1,12 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Users, FolderOpen, Settings as SettingsIcon, LogOut, Code2, Globe, Film, Download } from 'lucide-react';
+import { Users, FolderOpen, Settings as SettingsIcon, LogOut, LogIn, Code2, Globe, Film, Download } from 'lucide-react';
 import { useAuth } from '../../providers/AuthProvider';
 
 export const Sidebar = ({ isSidebarOpen }) => {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const isDesktop = typeof window !== 'undefined' && !!window.electronAPI;
+  const isLocal = user?.isLocal || !user;
 
   const baseNavItems = [
     { name: 'Projects', href: '/projects', icon: FolderOpen },
@@ -61,13 +62,23 @@ export const Sidebar = ({ isSidebarOpen }) => {
             <SettingsIcon className="mr-3 h-5 w-5 shrink-0" />
             Settings
           </NavLink>
-          <button
-            onClick={() => logout()}
-            className="w-full group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"
-          >
-            <LogOut className="mr-3 h-5 w-5 shrink-0" />
-            Sign out
-          </button>
+          {isLocal ? (
+            <NavLink
+              to="/login"
+              className="w-full group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg text-indigo-400 hover:bg-indigo-500/10 hover:text-indigo-300 transition-colors"
+            >
+              <LogIn className="mr-3 h-5 w-5 shrink-0" />
+              Sign In to Cloud
+            </NavLink>
+          ) : (
+            <button
+              onClick={() => logout()}
+              className="w-full group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+            >
+              <LogOut className="mr-3 h-5 w-5 shrink-0" />
+              Sign out
+            </button>
+          )}
         </nav>
       </div>
     </div>

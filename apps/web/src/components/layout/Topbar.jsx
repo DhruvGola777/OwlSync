@@ -12,7 +12,8 @@ export const Topbar = ({ isSidebarOpen, setIsSidebarOpen }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const isGuest = user?.email?.includes('guest_') || user?.name === 'Guest Developer';
+  const isLocal = user?.isLocal || !user;
+  const isGuest = !isLocal && (user?.email?.includes('guest_') || user?.name === 'Guest Developer');
 
   // Global Ctrl + K / Cmd + K shortcut
   useEffect(() => {
@@ -55,7 +56,14 @@ export const Topbar = ({ isSidebarOpen, setIsSidebarOpen }) => {
           </div>
           
           <div className="flex flex-1 justify-end items-center gap-x-4 lg:gap-x-6">
-            {isGuest && (
+            {isLocal ? (
+              <button
+                onClick={() => navigate('/login')}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-all shadow-sm"
+              >
+                <span>Sign In to Cloud</span>
+              </button>
+            ) : isGuest ? (
               <button
                 onClick={() => {
                   logout();
@@ -68,7 +76,7 @@ export const Topbar = ({ isSidebarOpen, setIsSidebarOpen }) => {
                 <span>Guest Mode</span>
                 <span className="font-semibold text-indigo-600 hover:text-indigo-800 ml-1">Sign In</span>
               </button>
-            )}
+            ) : null}
 
             <FriendsMenu />
             <NotificationsMenu />
