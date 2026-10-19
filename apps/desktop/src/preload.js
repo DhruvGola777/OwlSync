@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   isDesktop: true,
+  hasNativeFrame: true,
   platform: process.platform,
 
   // Window Controls
@@ -9,6 +10,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   maximizeWindow: () => ipcRenderer.invoke('window:maximize'),
   closeWindow: () => ipcRenderer.invoke('window:close'),
   isWindowMaximized: () => ipcRenderer.invoke('window:isMaximized'),
+  openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
+  startOAuth: (provider) => ipcRenderer.invoke('auth:startOAuth', provider),
 
   // Native Local File System Access
   openLocalFolder: () => ipcRenderer.invoke('fs:openFolder'),

@@ -1,10 +1,9 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
 let mainWindow = null;
-
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+const isDev = !app.isPackaged;
 
 async function scanDirectory(dirPath, rootPath = dirPath) {
   const ignored = new Set(['.git', 'node_modules', '.turbo', '.next', 'dist', 'build', '.DS_Store']);
@@ -46,6 +45,73 @@ async function scanDirectory(dirPath, rootPath = dirPath) {
   return results;
 }
 
+ipcMain.handle('shell:openExternal', async (_event, url) => {
+  return await shell.openExternal(url);
+});
+
+ipcMain.handle('auth:startOAuth', async (_event, provider) => {
+  return new Promise((resolve) => {
+    const authUrl = `https://owlsync-api.onrender.com/api/auth/oauth/${provider}`;
+    const authWindow = new BrowserWindow({
+      width: 520,
+      height: 680,
+      parent: mainWindow || undefined,
+      modal: true,
+      title: `Sign in with ${provider.charAt(0).toUpperCase() + provider.slice(1)} - OwlSync`,
+      autoHideMenuBar: true,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true
+      }
+    });
+
+    authWindow.setMenu(null);
+
+    // Use standard Chrome browser User-Agent so Google OAuth does not block embedded Electron agent
+    const chromeUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+    authWindow.webContents.setUserAgent(chromeUA);
+
+    let isHandled = false;
+
+    const checkUrl = (targetUrl) => {
+      try {
+        if (!targetUrl || isHandled) return;
+        const parsed = new URL(targetUrl);
+        if (parsed.searchParams.has('token')) {
+          isHandled = true;
+          const token = parsed.searchParams.get('token');
+          const refreshToken = parsed.searchParams.get('refreshToken');
+          setTimeout(() => {
+            if (!authWindow.isDestroyed()) authWindow.destroy();
+          }, 300);
+          resolve({ success: true, token, refreshToken });
+        } else if (parsed.searchParams.has('error')) {
+          isHandled = true;
+          const error = parsed.searchParams.get('error');
+          setTimeout(() => {
+            if (!authWindow.isDestroyed()) authWindow.destroy();
+          }, 300);
+          resolve({ success: false, error });
+        }
+      } catch (e) {
+        // Ignore parsing errors for interim non-standard URLs
+      }
+    };
+
+    authWindow.webContents.on('will-redirect', (_e, url) => checkUrl(url));
+    authWindow.webContents.on('will-navigate', (_e, url) => checkUrl(url));
+    authWindow.webContents.on('did-navigate', (_e, url) => checkUrl(url));
+
+    authWindow.on('closed', () => {
+      if (!isHandled) {
+        resolve({ success: false, cancelled: true });
+      }
+    });
+
+    authWindow.loadURL(authUrl);
+  });
+});
+
 function createWindow() {
   const iconPath = path.join(__dirname, '../resources/icon.png');
 
@@ -57,8 +123,7 @@ function createWindow() {
     title: 'OwlSync - Collaborative Cloud IDE',
     icon: iconPath,
     backgroundColor: '#1e1e1e',
-    frame: false, // Frameless for VS Code custom titlebar styling
-    titleBarStyle: 'hidden',
+    frame: true, // Native Windows titlebar with minimize, maximize, and close buttons
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

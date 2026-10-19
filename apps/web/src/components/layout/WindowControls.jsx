@@ -17,7 +17,7 @@ export const WindowControls = () => {
     return cleanup;
   }, [isDesktop]);
 
-  if (!isDesktop) return null;
+  if (!isDesktop || window.electronAPI?.hasNativeFrame) return null;
 
   return (
     <div className="flex items-center h-full select-none ml-2" style={{ WebkitAppRegion: 'no-drag' }}>

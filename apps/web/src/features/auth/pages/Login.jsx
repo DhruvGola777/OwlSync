@@ -4,11 +4,11 @@ import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { useAuth } from '../../../providers/AuthProvider';
 import { AuthLayout } from '../components/AuthLayout';
-import { api } from '../../../services/api';
+import { api, API_URL } from '../../../services/api';
 
 export const Login = () => {
   const navigate = useNavigate();
-  const { login, loginTwoFactor, user } = useAuth();
+  const { login, loginTwoFactor, register, checkAuth, user } = useAuth();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const successMessage = searchParams.get('registered') 
@@ -27,6 +27,52 @@ export const Login = () => {
   
   const [requires2FA, setRequires2FA] = useState(false);
   const [isMagicLinkMode, setIsMagicLinkMode] = useState(false);
+
+  const handleOAuth = async (provider) => {
+    setError('');
+    if (window.electronAPI?.startOAuth) {
+      try {
+        setIsLoading(true);
+        const result = await window.electronAPI.startOAuth(provider);
+        if (result.success && result.token) {
+          localStorage.setItem('owlsync_token', result.token);
+          if (result.refreshToken) {
+            localStorage.setItem('owlsync_refresh_token', result.refreshToken);
+          }
+          await checkAuth();
+          navigate('/dashboard');
+        } else if (result.error) {
+          setError(result.error);
+        }
+      } catch (err) {
+        setError(err.message || 'Authentication failed');
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      window.location.href = `${API_URL}/auth/oauth/${provider}`;
+    }
+  };
+
+  const handleQuickDemoLogin = async () => {
+    setError('');
+    setIsLoading(true);
+    try {
+      const demoEmail = `guest_${Math.floor(Date.now() / 1000)}@owlsync.dev`;
+      const demoPassword = 'DemoPassword123!';
+      try {
+        await register(demoEmail, demoPassword, 'Guest Developer');
+      } catch (regErr) {
+        // Fallback if user already created
+      }
+      await login(demoEmail, demoPassword);
+      navigate('/dashboard');
+    } catch (err) {
+      setError('Failed to start guest session: ' + (err.message || 'Please sign in or register'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (user) {
     return <Navigate to="/dashboard" replace />;
@@ -208,10 +254,8 @@ export const Login = () => {
               variant="outline" 
               className="w-full flex justify-center" 
               type="button"
-              onClick={() => {
-                const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
-                window.location.href = `${apiBase}/auth/oauth/google`;
-              }}
+              isLoading={isLoading}
+              onClick={() => handleOAuth('google')}
             >
               Google
             </Button>
@@ -219,12 +263,22 @@ export const Login = () => {
               variant="outline" 
               className="w-full flex justify-center" 
               type="button"
-              onClick={() => {
-                const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
-                window.location.href = `${apiBase}/auth/oauth/github`;
-              }}
+              isLoading={isLoading}
+              onClick={() => handleOAuth('github')}
             >
               GitHub
+            </Button>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-gray-100">
+            <Button
+              variant="secondary"
+              className="w-full flex justify-center text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300"
+              type="button"
+              isLoading={isLoading}
+              onClick={handleQuickDemoLogin}
+            >
+              ⚡ Explore with 1-Click Guest Session
             </Button>
           </div>
         </div>
