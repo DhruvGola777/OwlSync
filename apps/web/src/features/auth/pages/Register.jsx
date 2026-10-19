@@ -4,6 +4,7 @@ import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { useAuth } from '../../../providers/AuthProvider';
 import { AuthLayout } from '../components/AuthLayout';
+import { API_URL } from '../../../services/api';
 
 export const Register = () => {
   const navigate = useNavigate();
@@ -88,9 +89,24 @@ export const Register = () => {
             variant="outline" 
             className="w-full flex justify-center" 
             type="button"
-            onClick={() => {
-              const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
-              window.location.href = `${apiBase}/auth/oauth/google`;
+            isLoading={isLoading}
+            onClick={async () => {
+              if (window.electronAPI?.startOAuth) {
+                setIsLoading(true);
+                try {
+                  const result = await window.electronAPI.startOAuth('google');
+                  if (result.success && result.token) {
+                    localStorage.setItem('owlsync_token', result.token);
+                    navigate('/dashboard');
+                  }
+                } catch (e) {
+                  setError(e.message);
+                } finally {
+                  setIsLoading(false);
+                }
+              } else {
+                window.location.href = `${API_URL}/auth/oauth/google`;
+              }
             }}
           >
             Google
@@ -99,9 +115,24 @@ export const Register = () => {
             variant="outline" 
             className="w-full flex justify-center" 
             type="button"
-            onClick={() => {
-              const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
-              window.location.href = `${apiBase}/auth/oauth/github`;
+            isLoading={isLoading}
+            onClick={async () => {
+              if (window.electronAPI?.startOAuth) {
+                setIsLoading(true);
+                try {
+                  const result = await window.electronAPI.startOAuth('github');
+                  if (result.success && result.token) {
+                    localStorage.setItem('owlsync_token', result.token);
+                    navigate('/dashboard');
+                  }
+                } catch (e) {
+                  setError(e.message);
+                } finally {
+                  setIsLoading(false);
+                }
+              } else {
+                window.location.href = `${API_URL}/auth/oauth/github`;
+              }
             }}
           >
             GitHub

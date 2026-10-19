@@ -44,8 +44,15 @@ apiClient.interceptors.response.use(
         localStorage.removeItem('owlsync_token');
         localStorage.removeItem('owlsync_refresh_token');
         // If refresh fails, they really are logged out
-        if (window.location.pathname !== '/login' && window.location.pathname !== '/register' && window.location.pathname !== '/' && window.location.pathname !== '/download') {
-          window.location.href = '/login';
+        const isElectron = typeof window !== 'undefined' && (Boolean(window.electronAPI) || window.navigator.userAgent.includes('Electron') || window.location.protocol === 'file:');
+        if (isElectron) {
+          if (!window.location.hash.includes('/login') && !window.location.hash.includes('/register')) {
+            window.location.hash = '#/login';
+          }
+        } else {
+          if (window.location.pathname !== '/login' && window.location.pathname !== '/register' && window.location.pathname !== '/' && window.location.pathname !== '/download') {
+            window.location.href = '/login';
+          }
         }
         return Promise.reject(refreshError);
       }

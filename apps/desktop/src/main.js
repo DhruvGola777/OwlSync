@@ -156,20 +156,18 @@ function createWindow() {
     console.error('Failed to load:', errorCode, errorDescription, validatedURL);
   });
 
-  if (isDev) {
-    const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:3000';
-    mainWindow.loadURL(devUrl).catch(() => {
-      // Fallback if dev server is starting up
-      setTimeout(() => mainWindow?.loadURL(devUrl), 2000);
+  const packagedPath = path.join(__dirname, '../web-dist/index.html');
+  const localPath = path.join(__dirname, '../../web/dist/index.html');
+  const indexPath = fs.existsSync(packagedPath) ? packagedPath : localPath;
+
+  if (process.env.VITE_DEV_SERVER_URL) {
+    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+  } else if (!app.isPackaged && process.env.NODE_ENV === 'development') {
+    mainWindow.loadURL('http://localhost:3000').catch(() => {
+      mainWindow.loadFile(indexPath);
     });
   } else {
-    const packagedPath = path.join(__dirname, '../web-dist/index.html');
-    const localPath = path.join(__dirname, '../../web/dist/index.html');
-    if (fs.existsSync(packagedPath)) {
-      mainWindow.loadFile(packagedPath);
-    } else {
-      mainWindow.loadFile(localPath);
-    }
+    mainWindow.loadFile(indexPath);
   }
 
   mainWindow.on('closed', () => {
