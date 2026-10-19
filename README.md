@@ -5,22 +5,22 @@
 
 **A distributed, low-latency development environment combining the power of VS Code, Discord, and Google Docs.**
 
-[![Build Status](https://img.shields.io/badge/Build-Passing-10b981?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Tests](https://img.shields.io/badge/Tests-8%2F8%20Passed-6366f1?style=for-the-badge&logo=jest&logoColor=white)](https://jestjs.io/)
+[![Live Web IDE](https://img.shields.io/badge/Live%20Web%20IDE-owlsync.vercel.app-6366f1?style=for-the-badge&logo=vercel&logoColor=white)](https://owlsync.vercel.app)
+[![Windows App](https://img.shields.io/badge/Windows%20Desktop-Download%20.EXE-0078d4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/DhruvGola777/OwlSync/releases/latest/download/OwlSync-Setup-1.0.0.exe)
+[![Electron](https://img.shields.io/badge/Electron-v33-47848F?style=for-the-badge&logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-v20%2B-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-3178c6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15.0-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7.0%20Cluster-dc382d?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
 [![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3.12-ff6600?style=for-the-badge&logo=rabbitmq&logoColor=white)](https://www.rabbitmq.com/)
 [![Docker](https://img.shields.io/badge/Docker-Orchestrated-2496ed?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 
 <p align="center">
+  <a href="https://owlsync.vercel.app"><b>🚀 Launch Web IDE</b></a> •
+  <a href="https://github.com/DhruvGola777/OwlSync/releases/latest/download/OwlSync-Setup-1.0.0.exe"><b>💻 Download Windows App (.exe)</b></a> •
   <a href="#-system-architecture">Architecture</a> •
   <a href="#-core-feature-matrix">Features</a> •
   <a href="#-monorepo-topology">Folder Structure</a> •
-  <a href="#-getting-started-locally">Quick Start</a> •
-  <a href="#-enterprise-documentation-portal">Documentation (SDD)</a> •
-  <a href="#-security--distributed-reliability">Security & Redlock</a>
+  <a href="#-getting-started-locally">Quick Start</a>
 </p>
 
 ---
@@ -48,7 +48,8 @@ OwlSync follows a decoupled **Modular Monorepo Architecture**, separating the fr
 ```mermaid
 flowchart TB
     subgraph Clients ["Client Layer"]
-        Browser["OwlSync Web Client (React 18 / Monaco)"]
+        Browser["OwlSync Web Client (React 19 / Monaco)"]
+        Desktop["OwlSync Desktop (Electron 33 / Native FS)"]
         VoiceMesh["WebRTC Voice Mesh (P2P Audio)"]
         ScreenRec["Session Recorder (MediaStream WebM)"]
         Terminal["In-Browser Terminal (POSIX Shell)"]
@@ -152,6 +153,7 @@ flowchart TB
 | Category | Enterprise Capability | Technical Implementation |
 |:---|:---|:---|
 | **Editor & Sync** | **Zero-Conflict Collaborative Code Editing** | Monaco Editor integrated with **Yjs CRDTs** over WebSockets; custom cursor presence renderer with dynamic author color-tagging. |
+| **Desktop Shell** | **Native Windows App & Local Offline Mode** | Packaged Electron 33 client with native file-system bindings (`fs.promises`), offline workspace launch (like VS Code), and loopback OAuth bridge. |
 | **Media & Comms** | **P2P Voice Mesh & Audio Rooms** | Ultra-low latency WebRTC audio mesh with speaking indicators, local mute, and Socket.IO signaling relay. |
 | **Media Engine** | **In-IDE Screen & Audio Session Recorder** | Captures canvas and audio streams directly into standard `.webm` archives with asynchronous background thumbnail rendering. |
 | **AI Intelligence** | **Context-Aware AI Pair Programmer** | Automated code explanations, refactoring, test generation, bug detection, and **Server-Sent Events (SSE)** streaming pair programmer. |
@@ -177,9 +179,12 @@ owlsync/
 │   │   ├── src/modules/         # Domain Modules: auth, users, projects, teams, badges, ai, search
 │   │   ├── src/services/        # Distributed lock, cache, and metrics services
 │   │   └── tests/               # Jest automated integration & security test suites
+│   ├── desktop/                 # Native Windows Desktop Application (Electron 33, NSIS)
+│   │   ├── src/                 # Main process, preload script, loopback OAuth bridge, native FS IPC
+│   │   └── resources/           # App icons, installer configs, packaging assets
 │   ├── socket/                  # Real-Time WebSocket Microservice (Socket.IO, Yjs, WebRTC)
 │   │   └── src/handlers/        # Handlers: editor, voice, room, activity, chat
-│   ├── web/                     # Single Page Application (React 18, Vite, Tailwind CSS, Monaco)
+│   ├── web/                     # Single Page Application (React 19, Vite, Tailwind CSS, Monaco)
 │   │   ├── src/features/        # Domain UI: rooms, projects, teams, recordings, users, auth
 │   │   └── src/components/      # UI Design System: layout, modals, terminal, voice controls
 │   └── workers/                 # Asynchronous RabbitMQ Consumers
@@ -232,11 +237,22 @@ npm run db:generate
 npm run dev
 ```
 
+### Step 4: Run or Package Native Desktop Application
+```bash
+# Launch Electron desktop client in development mode
+npm run dev --workspace=apps/desktop
+
+# Compile production Windows installer (.exe)
+npm run build:win --workspace=apps/desktop
+```
+
 ### 🌐 Service Endpoints Directory
 
 | Service | Port / URL | Description | Credentials (if applicable) |
 |:---|:---|:---|:---|
-| **Web Client** | `http://localhost:3000` | Main Cloud IDE & Workspace Dashboard | — |
+| **Web Client (Live)** | [owlsync.vercel.app](https://owlsync.vercel.app) | Production Web Cloud IDE | — |
+| **Windows Desktop App** | [Download .exe](https://github.com/DhruvGola777/OwlSync/releases/latest/download/OwlSync-Setup-1.0.0.exe) | Native Offline & Cloud Desktop Shell | — |
+| **Local Web Dev** | `http://localhost:3000` | Local Web Client Dev Server | — |
 | **REST API Server** | `http://localhost:4000` | Core Application Backend | — |
 | **Swagger OpenAPI Docs** | `http://localhost:4000/api-docs` | Interactive Swagger API Documentation | — |
 | **Real-Time Socket Server** | `http://localhost:4001` | Socket.IO WebSocket Engine | — |
