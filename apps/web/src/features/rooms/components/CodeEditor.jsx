@@ -111,9 +111,8 @@ export const CodeEditor = ({
     latestFileRef.current = activeFile;
     if (activeFile?.id && yDocRef.current) {
       const type = yDocRef.current.getText(activeFile.id);
-      if (activeFile.content !== undefined && type.toString() !== activeFile.content) {
+      if (type.toString() === '' && activeFile.content) {
         yDocRef.current.transact(() => {
-          type.delete(0, type.length);
           type.insert(0, activeFile.content);
         });
       }
@@ -329,7 +328,7 @@ export const CodeEditor = ({
       if (!yDocRef.current || !editor) return;
 
       const type = yDocRef.current.getText(fileId);
-      if (!roomId && type.toString() === '' && fileContent) {
+      if (type.toString() === '' && fileContent) {
         type.insert(0, fileContent);
       }
       

@@ -26,84 +26,113 @@ dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 const PORT = process.env.SOCKET_PORT || 4001;
 
-const httpServer = createServer();
-const io = new Server(httpServer, {
-  cors: {
-    origin: true,
-    methods: ['GET', 'POST'],
-    credentials: true,
-  },
-  adapter: createAdapter(pubClient, subClient),
-});
+export const initSocketServer = async (httpServer) => {
+  let isRedisReady = false;
+  try {
+    await connectRedis();
+    if (pubClient.isOpen && subClient.isOpen) {
+      isRedisReady = true;
+    }
+  } catch (redisErr) {
+    console.warn('⚠️ Redis connection skipped/unavailable, running with in-memory adapter:', redisErr.message);
+  }
 
-dockerService.setIo(io);
+  const ioConfig = {
+    cors: {
+      origin: true,
+      methods: ['GET', 'POST'],
+      credentials: true,
+    },
+    transports: ['websocket', 'polling'],
+  };
 
-// Middleware
-io.use(requireSocketAuth);
-
-io.on('connection', async (socket) => {
-  const userId = socket.user?.userId;
-  console.log(`User connected: ${userId} (Socket: ${socket.id})`);
-
-  if (userId) {
-    socket.join(`user:${userId}`);
+  if (isRedisReady) {
     try {
-      // 1. Fast path: Track online status in Redis
-      await pubClient.set(`user:${userId}:status`, 'ONLINE');
-      
-      // 2. Persistent path: Update last seen in DB
-      await prisma.user.update({
-        where: { id: userId },
-        data: { status: 'ONLINE', lastSeen: new Date() }
-      });
-      
-      // Emit a global event if we want to notify others instantly
-      io.emit('user:status_change', { userId, status: 'ONLINE' });
-    } catch (err) {
-      console.error('Failed to update user status to ONLINE', err);
+      ioConfig.adapter = createAdapter(pubClient, subClient);
+      console.log('✅ Socket.IO Redis adapter enabled');
+    } catch (e) {
+      console.warn('⚠️ Could not attach Redis adapter, defaulting to in-memory:', e.message);
     }
   }
 
-  // Register Handlers
-  registerRoomHandlers(io, socket);
-  registerChatHandlers(io, socket);
-  registerEditorHandlers(io, socket);
-  registerNotesHandlers(io, socket);
-  registerWhiteboardHandlers(io, socket);
-  registerActivityHandlers(io, socket);
-  registerTerminalHandlers(io, socket);
-  registerVoiceHandlers(io, socket);
+  const io = new Server(httpServer, ioConfig);
+  dockerService.setIo(io);
 
-  socket.on('disconnect', async () => {
-    console.log(`User disconnected: ${userId} (Socket: ${socket.id})`);
+  // Middleware
+  io.use(requireSocketAuth);
+
+  io.on('connection', async (socket) => {
+    const userId = socket.user?.userId;
+    console.log(`User connected: ${userId} (Socket: ${socket.id})`);
+
     if (userId) {
+      socket.join(`user:${userId}`);
       try {
-        const sockets = await io.fetchSockets();
-        const stillConnected = sockets.some(s => s.user?.userId === userId);
-
-        if (!stillConnected) {
-          await pubClient.set(`user:${userId}:status`, 'OFFLINE').catch(() => {});
-          
-          await prisma.user.update({
-            where: { id: userId },
-            data: { status: 'OFFLINE', lastSeen: new Date() }
-          }).catch(() => {});
-          
-          io.emit('user:status_change', { userId, status: 'OFFLINE', lastSeen: new Date() });
+        if (pubClient.isOpen) {
+          await pubClient.set(`user:${userId}:status`, 'ONLINE').catch(() => {});
         }
+        
+        await prisma.user.update({
+          where: { id: userId },
+          data: { status: 'ONLINE', lastSeen: new Date() }
+        }).catch(() => {});
+        
+        io.emit('user:status_change', { userId, status: 'ONLINE' });
       } catch (err) {
-        console.error('Failed to update user status to OFFLINE:', err.message);
+        console.error('Failed to update user status to ONLINE', err);
       }
     }
-  });
-});
 
-const startServer = async () => {
-  await connectRedis();
-  
-  httpServer.listen(PORT, () => {
-    console.log(`🔌 Socket Server running on http://localhost:${PORT}`);
+    // Register Handlers
+    registerRoomHandlers(io, socket);
+    registerChatHandlers(io, socket);
+    registerEditorHandlers(io, socket);
+    registerNotesHandlers(io, socket);
+    registerWhiteboardHandlers(io, socket);
+    registerActivityHandlers(io, socket);
+    registerTerminalHandlers(io, socket);
+    registerVoiceHandlers(io, socket);
+
+    socket.on('disconnect', async () => {
+      console.log(`User disconnected: ${userId} (Socket: ${socket.id})`);
+      if (userId) {
+        try {
+          const sockets = await io.fetchSockets();
+          const stillConnected = sockets.some(s => s.user?.userId === userId);
+
+          if (!stillConnected) {
+            if (pubClient.isOpen) {
+              await pubClient.set(`user:${userId}:status`, 'OFFLINE').catch(() => {});
+            }
+            
+            await prisma.user.update({
+              where: { id: userId },
+              data: { status: 'OFFLINE', lastSeen: new Date() }
+            }).catch(() => {});
+            
+            io.emit('user:status_change', { userId, status: 'OFFLINE', lastSeen: new Date() });
+          }
+        } catch (err) {
+          console.error('Failed to update user status to OFFLINE:', err.message);
+        }
+      }
+    });
   });
+
+  return io;
 };
 
-startServer();
+// Auto-run if executed directly as main script
+const isDirectRun = process.argv[1] && (
+  path.resolve(process.argv[1]) === path.resolve(__filename) ||
+  process.argv[1].endsWith('server.js')
+);
+
+if (isDirectRun && !process.env.OWLSYNC_EMBEDDED_SOCKET) {
+  const httpServer = createServer();
+  initSocketServer(httpServer).then(() => {
+    httpServer.listen(PORT, () => {
+      console.log(`🔌 Standalone Socket Server running on http://localhost:${PORT}`);
+    });
+  });
+}

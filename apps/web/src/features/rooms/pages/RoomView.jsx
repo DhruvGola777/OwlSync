@@ -24,7 +24,7 @@ import { VoiceControlBar } from '../components/VoiceControlBar';
 import { RecordingModal } from '../components/RecordingModal';
 import { useVoiceRoom } from '../hooks/useVoiceRoom';
 import { useSessionRecorder } from '../hooks/useSessionRecorder';
-import { Sparkles, Film, StopCircle, BarChart3 } from 'lucide-react';
+import { Sparkles, Film, StopCircle, BarChart3, KeyRound, Lock } from 'lucide-react';
 import { AnalyticsModal } from '../../analytics/components/AnalyticsModal';
 import { WindowControls } from '../../../components/layout/WindowControls';
 
@@ -58,6 +58,35 @@ export const RoomView = () => {
   const [bottomPanelTab, setBottomPanelTab] = useState('terminal');
   const [pendingDiff, setPendingDiff] = useState(null);
   const [aiEditHistory, setAiEditHistory] = useState([]);
+  
+  // Protected Room Password Prompt State
+  const [reloadTrigger, setReloadTrigger] = useState(0);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [roomPasswordInput, setRoomPasswordInput] = useState('');
+  const [passwordModalError, setPasswordModalError] = useState('');
+  const [isJoiningWithPassword, setIsJoiningWithPassword] = useState(false);
+  const [pendingProtectedRoom, setPendingProtectedRoom] = useState(null);
+
+  const handlePasswordSubmit = async (e) => {
+    e?.preventDefault();
+    if (!roomPasswordInput.trim()) {
+      setPasswordModalError('Please enter the room password.');
+      return;
+    }
+    setIsJoiningWithPassword(true);
+    setPasswordModalError('');
+    try {
+      await api.joinRoom(id, roomPasswordInput.trim());
+      setShowPasswordModal(false);
+      setRoomPasswordInput('');
+      setLoading(true);
+      setReloadTrigger(prev => prev + 1);
+    } catch (err) {
+      setPasswordModalError(err.message || 'Incorrect room password. Please try again.');
+    } finally {
+      setIsJoiningWithPassword(false);
+    }
+  };
 
   const handleAcceptDiff = async (diff) => {
     const diffToAccept = diff || pendingDiff;
@@ -439,6 +468,20 @@ export const RoomView = () => {
         if (isProjectMode) {
           const project = await api.getProject(id);
           setRoom({ id: null, name: project.name, project: project, members: [] });
+          if (project.files?.length > 0) {
+            setOpenFiles(prev => {
+              if (prev.length === 0) {
+                const defaultFile = project.files.find(f => f.name === 'index.js') || 
+                                  project.files.find(f => !f.name.startsWith('.')) || 
+                                  project.files[0];
+                if (defaultFile) {
+                  setActiveFileId(defaultFile.id);
+                  return [defaultFile];
+                }
+              }
+              return prev;
+            });
+          }
           setLoading(false);
           return;
         }
@@ -446,12 +489,13 @@ export const RoomView = () => {
         const res = await api.getRoom(id);
         let fetchedRoom = res.room;
         
-        const isMember = fetchedRoom.members.some(m => m.user.id === user?.id);
+        const isMember = fetchedRoom.members.some(m => m.user?.id === user?.id || m.userId === user?.id);
 
         if (!isMember) {
           if (fetchedRoom.isProtected) {
-            alert("This room is password protected. Please join from the dashboard.");
-            navigate('/');
+            setPendingProtectedRoom(fetchedRoom);
+            setShowPasswordModal(true);
+            setLoading(false);
             return;
           } else {
             try {
@@ -461,13 +505,27 @@ export const RoomView = () => {
             } catch (joinErr) {
               console.error('Failed to auto-join public room', joinErr);
               alert(joinErr.message || 'Failed to join room');
-              navigate('/');
+              navigate('/rooms');
               return;
             }
           }
         }
 
         setRoom(fetchedRoom);
+        if (fetchedRoom.project?.files?.length > 0) {
+          setOpenFiles(prev => {
+            if (prev.length === 0) {
+              const defaultFile = fetchedRoom.project.files.find(f => f.name === 'index.js') || 
+                                fetchedRoom.project.files.find(f => !f.name.startsWith('.')) || 
+                                fetchedRoom.project.files[0];
+              if (defaultFile) {
+                setActiveFileId(defaultFile.id);
+                return [defaultFile];
+              }
+            }
+            return prev;
+          });
+        }
         if (user?.id) {
           setActiveUsers(prev => [...new Set([...prev, user.id])]);
         }
@@ -497,7 +555,7 @@ export const RoomView = () => {
           }
         });
         socket.on('room:user_left', ({ userId }) => setActiveUsers(prev => prev.filter(uid => uid !== userId)));
-        socket.on('room:kicked', () => { alert('You have been kicked from the room.'); navigate('/'); });
+        socket.on('room:kicked', () => { alert('You have been kicked from the room.'); navigate('/rooms'); });
         socket.on('room:role_changed', ({ targetUserId, role }) => {
           setRoom(prev => {
             if (!prev || !prev.members) return prev;
@@ -514,7 +572,6 @@ export const RoomView = () => {
           try {
             const updatedRes = await api.getRoom(id);
             setRoom(updatedRes.room);
-            // Could also close tabs if deleted, but re-fetching room is good enough for MVP sync
           } catch (e) {
             console.error('Error refetching room for files sync', e);
           }
@@ -522,7 +579,7 @@ export const RoomView = () => {
 
       } catch (err) {
         console.error('Failed to load:', err);
-        navigate('/');
+        navigate('/rooms');
       } finally {
         setLoading(false);
       }
@@ -541,7 +598,91 @@ export const RoomView = () => {
         socket.off('project:files_changed');
       }
     };
-  }, [id, navigate, token, isProjectMode, user?.id]);
+  }, [id, navigate, token, isProjectMode, user?.id, reloadTrigger]);
+
+  if (showPasswordModal && pendingProtectedRoom) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#18181b] relative overflow-hidden select-none px-4">
+        {/* Ambient glow effects */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-indigo-600/15 rounded-full blur-[120px] pointer-events-none" />
+        
+        <div className="w-full max-w-md bg-[#202026]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-6 sm:p-8 relative z-10 animate-in fade-in zoom-in-95 duration-200">
+          <div className="flex flex-col items-center text-center">
+            <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4 shadow-inner">
+              <KeyRound className="w-7 h-7" />
+            </div>
+            
+            <h2 className="text-xl font-bold text-white tracking-tight">Protected Room</h2>
+            <p className="text-sm font-medium text-indigo-400 mt-1 max-w-xs truncate">
+              {pendingProtectedRoom.name}
+            </p>
+            {pendingProtectedRoom.description && (
+              <p className="text-xs text-gray-400 mt-1 line-clamp-2 max-w-sm">
+                {pendingProtectedRoom.description}
+              </p>
+            )}
+            
+            {pendingProtectedRoom.owner && (
+              <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-gray-300">
+                <span className="text-gray-500">Host:</span>
+                <span className="font-semibold text-white">{pendingProtectedRoom.owner.name || pendingProtectedRoom.owner.username}</span>
+              </div>
+            )}
+          </div>
+
+          <form onSubmit={handlePasswordSubmit} className="mt-6 space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+                Room Password
+              </label>
+              <input
+                type="password"
+                value={roomPasswordInput}
+                onChange={(e) => {
+                  setRoomPasswordInput(e.target.value);
+                  setPasswordModalError('');
+                }}
+                placeholder="Enter password to join..."
+                autoFocus
+                className="w-full px-3.5 py-2.5 bg-[#141418] border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
+              />
+            </div>
+
+            {passwordModalError && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-300 flex items-start gap-2">
+                <span className="font-bold shrink-0">Error:</span>
+                <span>{passwordModalError}</span>
+              </div>
+            )}
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => navigate('/rooms')}
+                className="flex-1 px-4 py-2.5 bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white rounded-xl text-xs font-semibold transition-colors border border-white/10"
+              >
+                Back to Rooms
+              </button>
+              <button
+                type="submit"
+                disabled={isJoiningWithPassword || !roomPasswordInput.trim()}
+                className="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600 text-white rounded-xl text-xs font-semibold transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5"
+              >
+                {isJoiningWithPassword ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Joining...</span>
+                  </>
+                ) : (
+                  <span>Join Room</span>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   if (loading || !room) {
     return (

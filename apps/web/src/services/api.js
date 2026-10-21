@@ -1,6 +1,20 @@
 import axios from 'axios';
 
-export const API_URL = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && window.electronAPI ? 'https://owlsync-api.onrender.com/api' : 'http://localhost:4000/api');
+export const getApiUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  const isBrowser = typeof window !== 'undefined';
+  const isElectron = isBrowser && !!window.electronAPI;
+  const isHosted = isBrowser && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+
+  if (isHosted || isElectron) {
+    return 'https://owlsync-api.onrender.com/api';
+  }
+  return 'http://localhost:4000/api';
+};
+
+export const API_URL = getApiUrl();
 
 // Create an axios instance that automatically sends cookies
 const apiClient = axios.create({

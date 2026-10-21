@@ -1,24 +1,49 @@
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:4001';
+export const getSocketUrl = () => {
+  if (import.meta.env.VITE_SOCKET_URL) {
+    return import.meta.env.VITE_SOCKET_URL;
+  }
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '');
+  }
+  const isBrowser = typeof window !== 'undefined';
+  const isElectron = isBrowser && !!window.electronAPI;
+  const isHosted = isBrowser && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+
+  if (isHosted || isElectron) {
+    return 'https://owlsync-api.onrender.com';
+  }
+  return 'http://localhost:4000';
+};
+
+const SOCKET_URL = getSocketUrl();
 
 class SocketService {
   constructor() {
     this.socket = null;
   }
 
-  connect() {
-    if (this.socket) {
+  connect(authToken) {
+    if (this.socket && this.socket.connected) {
       return this.socket;
     }
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('owlsync_token') : null;
+    const token = authToken || (typeof window !== 'undefined' ? (localStorage.getItem('owlsync_token') || localStorage.getItem('owlsync_guest_token')) : null);
+
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
+    }
 
     this.socket = io(SOCKET_URL, {
       withCredentials: true,
       auth: { token },
       autoConnect: true,
       reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      transports: ['websocket', 'polling'],
     });
 
     this.socket.on('connect', () => {

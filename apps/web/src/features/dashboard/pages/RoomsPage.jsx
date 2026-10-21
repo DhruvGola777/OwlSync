@@ -73,13 +73,17 @@ export const RoomsPage = () => {
 
   const handleJoinRoom = async (e) => {
     e.preventDefault();
-    if (!joinRoomId.trim()) return;
+    const targetRoomId = joinRoomId.trim();
+    if (!targetRoomId) return;
 
     setIsSubmitting(true);
     setError('');
     try {
-      const res = await api.joinRoom(joinRoomId, joinRoomPassword || undefined);
-      navigate(`/room/${res.data.room.id}`);
+      await api.joinRoom(targetRoomId, joinRoomPassword || undefined);
+      setShowJoinModal(false);
+      setJoinRoomId('');
+      setJoinRoomPassword('');
+      navigate(`/room/${targetRoomId}`);
     } catch (err) {
       setError(err.message || 'Failed to join room');
     } finally {

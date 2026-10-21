@@ -26,11 +26,16 @@ import AppError from './utils/AppError.js';
 import { connectRabbitMQ, publishToQueue } from './config/rabbitmq.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createServer } from 'http';
+import { initSocketServer } from '../../socket/src/server.js';
+
+process.env.OWLSYNC_EMBEDDED_SOCKET = 'true';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+const httpServer = createServer(app);
 const PORT = env.PORT;
 
 // Security & Base Middleware
@@ -112,9 +117,15 @@ app.use(errorHandler);
 
 export const startServer = async () => {
   await connectRabbitMQ();
+  try {
+    await initSocketServer(httpServer);
+    console.log('🔌 Socket.IO successfully attached to HTTP server');
+  } catch (socketErr) {
+    console.error('⚠️ Could not initialize Socket.IO on API server:', socketErr.message);
+  }
 
-  return app.listen(PORT, () => {
-    console.log(`🚀 API Server running on http://localhost:${PORT}`);
+  return httpServer.listen(PORT, () => {
+    console.log(`🚀 OwlSync API & Realtime Socket Server running on http://localhost:${PORT}`);
   });
 };
 

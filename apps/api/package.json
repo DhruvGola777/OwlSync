@@ -31,7 +31,10 @@
     "qrcode": "^1.5.4",
     "rate-limit-redis": "^5.0.0",
     "redis": "^6.1.0",
-    "swagger-ui-express": "^5.0.1"
+    "socket.io": "^4.7.5",
+    "@socket.io/redis-adapter": "^8.3.0",
+    "swagger-ui-express": "^5.0.1",
+    "yjs": "^13.6.31"
   },
   "devDependencies": {
     "jest": "^30.4.2",
